@@ -1,0 +1,36 @@
+{
+  "rules": [
+    "Follow clean code principles and SOLID design patterns",
+    "Avoid unused variables, imports, and dead code",
+    "Ensure proper input validation and error handling",
+    "Check for potential security vulnerabilities (SQL injection, XSS, etc.)",
+    "Verify proper null/undefined checks to prevent runtime errors",
+    "Look for performance issues (N+1 queries, inefficient loops, etc.)",
+    "Ensure consistent naming conventions and code style",
+    "Check for proper async/await usage and promise handling",
+    "Verify proper resource cleanup (file handles, connections, etc.)",
+    "Look for hardcoded values that should be configurable",
+    "Ensure proper error messages for debugging",
+    "Check for race conditions in async code",
+    "Look for code duplication that could be extracted",
+    "Ensure proper logging for production debugging",
+    "Check for accessibility issues in UI code",
+    "Verify proper API response handling and error cases",
+    "Look for magic numbers and strings that need constants",
+    "Ensure proper documentation for complex logic",
+    "Check for proper test coverage of edge cases"
+  ],
+  "severity_levels": {
+    "critical": "Security vulnerabilities, data loss risks, breaking changes",
+    "high": "Runtime errors, performance issues, major bugs",
+    "medium": "Code quality issues, maintainability concerns",
+    "low": "Style inconsistencies, minor improvements"
+  },
+  "focus_areas": [
+    "Security: Authentication, authorization, input validation, sensitive data exposure",
+    "Performance: Database queries, API calls, algorithm complexity, caching",
+    "Reliability: Error handling, edge cases, null checks, race conditions",
+    "Maintainability: Code clarity, documentation, naming, structure",
+    "Testing: Test coverage, edge cases, integration points"
+  ]
+}
