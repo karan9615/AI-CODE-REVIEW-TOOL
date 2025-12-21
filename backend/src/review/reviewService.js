@@ -88,6 +88,7 @@ function buildEnrichedDiffs(diffs) {
       isRenamed: diff.renamed_file || false,
       isBinary: diff.binary || false,
       changes: [],
+      contextLines: [], // Store context for better understanding
     };
 
     if (!diff.diff || diff.binary) {
@@ -121,6 +122,12 @@ function buildEnrichedDiffs(diffs) {
         });
         newLine++;
       } else if (line.startsWith(" ")) {
+        // Include context lines (unchanged code around changes)
+        enriched.contextLines.push({
+          oldLine: oldLine,
+          newLine: newLine,
+          content: line.substring(1),
+        });
         oldLine++;
         newLine++;
       }
@@ -137,65 +144,72 @@ export async function generateInlineReviews(model, diffs) {
   const enrichedDiffs = buildEnrichedDiffs(diffs);
 
   const prompt = `
-You are a Senior GitLab Code Reviewer performing a line-by-line review.
+You are a **Senior Software Engineer** performing an **in-depth Code Review**.
 
-### CRITICAL RULES FOR INLINE COMMENTS
+### YOUR MISSION
+Perform a **thorough, critical analysis** of the code changes below. Look beyond surface-level issues.
 
-1. **You can ONLY comment on changed lines** - lines marked as "added" or "deleted"
-2. **You CANNOT comment on unchanged lines** - these don't appear in the changes array
-3. **Use EXACT line numbers** from the change objects below
-4. **For added lines**: use the "newLine" value in your "line" field
-5. **For deleted lines**: use the "oldLine" value in your "oldLine" field
+### CONTEXT PROVIDED
+For each file, you have:
+- **Changed lines** (added/deleted) with exact line numbers
+- **Context lines** (unchanged code surrounding the changes) to understand the broader logic
+- **File metadata** (new/deleted/renamed status)
 
-### Enriched Diff Data (with exact line numbers)
+### WHAT TO ANALYZE (in order of priority)
+
+#### 🔴 CRITICAL (Must comment if found)
+- **Security vulnerabilities**: SQL injection, XSS, hardcoded secrets, insecure authentication
+- **Data integrity risks**: Potential data loss, race conditions, incorrect state management
+- **Breaking changes**: API changes, removed functionality, incompatible updates
+- **Memory leaks**: Unclosed resources, event listener leaks, circular references
+- **Performance killers**: N+1 queries, unnecessary loops, blocking operations
+
+#### 🟡 HIGH PRIORITY
+- **Logic errors**: Incorrect conditions, off-by-one errors, missing edge cases
+- **Error handling gaps**: Unhandled promises, missing try-catch, silent failures
+- **Type safety issues**: Missing null checks, incorrect type assumptions
+- **Concurrency bugs**: Race conditions, missing async/await, promise chain errors
+
+#### 🟢 IMPORTANT
+- **Code smells**: Duplicated logic, overly complex functions, poor naming
+- **Maintainability**: Unclear logic, missing documentation for complex code
+- **Best practices**: Violation of SOLID principles, improper separation of concerns
+
+### ENRICHED DIFF DATA
 ${JSON.stringify(enrichedDiffs, null, 2)}
 
-### What to Review
-Comment ONLY on:
-- Bugs or logic errors
-- Security vulnerabilities
-- Performance issues
-- Code smells or maintainability concerns
-- Missing error handling
+### REVIEW RULES
+${JSON.stringify(rules, null, 2)}
 
-Do NOT comment on:
-- Formatting or style (unless critical)
-- Obvious changes
-- Things the code already makes clear
+### OUTPUT FORMAT (STRICT JSON)
 
-### Output Format (STRICT JSON)
-
-Return a JSON array where each comment references an EXACT line from the changes above:
+Return a JSON array with **detailed, actionable comments**:
 
 [
   {
     "filePath": "path/to/file.js",
-    "line": 14,
-    "comment": "Use const or let instead of var for better scoping"
+    "line": 42,
+    "severity": "critical|high|medium|low",
+    "comment": "**[Issue Type]**: Detailed explanation of the problem. **Why it matters**: Impact. **Suggested fix**: Specific code or approach."
   }
 ]
 
-**CRITICAL INSTRUCTIONS:**
-- For "added" changes: use "line" field with the "newLine" value
-- For "deleted" changes: use "oldLine" field with the "oldLine" value
-- ONLY use line numbers that appear in the enriched diff data above
-- If a line is not in the changes array, you CANNOT comment on it
-- Include "oldPath" field if file is renamed/deleted
+### CRITICAL INSTRUCTIONS
+- **Be specific**: Reference actual variable names, function names, and logic from the code
+- **Explain impact**: Don't just say "bad practice" - explain the real-world consequence
+- **Provide solutions**: Always suggest a concrete fix
+- **Use severity levels**: Mark critical security/data issues as "critical"
+- **Focus on substance**: Skip trivial style comments unless they affect readability
+- **Reference context**: Use the contextLines to understand the full picture before commenting
+- **For added lines**: use "line" field with the "newLine" value
+- **For deleted lines**: use "oldLine" field with the "oldLine" value
 
-### Example from the data above:
-
-If you see:
+### EXAMPLE OF A GOOD COMMENT
 {
-  "type": "added",
-  "newLine": 14,
-  "content": "  var name = document.getElementById..."
-}
-
-Your comment should be:
-{
-  "filePath": "script.js",
-  "line": 14,
-  "comment": "Use const or let instead of var"
+  "filePath": "src/api/userService.js",
+  "line": 23,
+  "severity": "critical",
+  "comment": "**SQL Injection Risk**: The query concatenates user input directly without parameterization. **Why it matters**: An attacker could execute arbitrary SQL (e.g., \`1' OR '1'='1\`). **Suggested fix**: Use parameterized queries: \`db.query('SELECT * FROM users WHERE id = ?', [userId])\`"
 }
 
 Return ONLY a JSON array. No markdown. No explanations.
