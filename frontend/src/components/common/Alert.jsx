@@ -10,7 +10,7 @@ export function Alert({ type = "error", children }) {
       : "border-l-accent-pink bg-accent-pink/10 text-accent-pink"
       }`}>
       {isSuccess ? <CheckCircle2 size={20} className="shrink-0" /> : <AlertCircle size={20} className="shrink-0" />}
-      <div className="flex-1 text-surface">{children}</div>
+      <div className="flex-1">{children}</div>
     </div>
   );
 }

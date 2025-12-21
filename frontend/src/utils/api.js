@@ -1,10 +1,15 @@
-export const api = async (path, body) => {
+export const api = async (path, body, method = "POST") => {
   try {
-    const response = await fetch("http://localhost:3001/api" + path, {
-      method: "POST",
+    const options = {
+      method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    };
+
+    if (method === "POST" && body) {
+      options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch("http://localhost:3001/api" + path, options);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

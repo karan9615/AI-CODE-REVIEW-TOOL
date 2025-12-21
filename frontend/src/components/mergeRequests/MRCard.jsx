@@ -1,21 +1,18 @@
 import React from "react";
 import { GitBranch, MessageSquare, Sparkles, ExternalLink } from "lucide-react";
-import { motion } from "framer-motion";
-import { Loader } from "../common/Loader";
+import { Card } from "../ui/Card";
+import { Button } from "../ui/Button";
 
 export function MRCard({ mr, onReview, isReviewing }) {
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="glass-panel p-6 rounded-2xl hover:border-primary/30 transition-all group"
-    >
+    <Card className="p-6 hover:border-primary/30 transition-all group">
       <div className="flex items-start gap-4 mb-4">
         <span className="bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 font-mono shadow-[0_0_10px_rgba(124,58,237,0.1)]">
           #{mr.iid}
         </span>
-        <h4 className="text-base font-bold text-surface leading-tight group-hover:text-primary-light transition-colors">{mr.title}</h4>
+        <h4 className="text-base font-bold text-surface leading-tight group-hover:text-primary-light transition-colors">
+          {mr.title}
+        </h4>
       </div>
 
       <div className="flex flex-wrap gap-4 text-sm text-surface-muted mb-6">
@@ -33,37 +30,28 @@ export function MRCard({ mr, onReview, isReviewing }) {
 
       <div className="flex gap-3">
         {mr.web_url && (
-          <a
+          <Button
             href={mr.web_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 glass-button text-surface-muted hover:text-surface rounded-xl text-sm font-medium"
+            variant="secondary"
+            icon={ExternalLink}
+            className="flex-1"
           >
             View in GitLab
-            <ExternalLink size={14} />
-          </a>
+          </Button>
         )}
-        <button
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium shadow-lg transition-all text-sm border ${isReviewing
-            ? "bg-primary/20 border-primary/20 cursor-not-allowed text-primary dark:text-white"
-            : "bg-primary border-primary/50 hover:bg-primary-hover shadow-primary/20 text-white"
-            }`}
+        <Button
           onClick={() => onReview(mr)}
           disabled={isReviewing}
+          isLoading={isReviewing}
+          loadingText="Reviewing..."
+          icon={Sparkles}
+          className="flex-1"
         >
-          {isReviewing ? (
-            <>
-              <div className="scale-75"><Loader size="sm" text="" /></div>
-              <span>Reviewing...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles size={16} />
-              AI Review
-            </>
-          )}
-        </button>
+          AI Review
+        </Button>
       </div>
-    </motion.div>
+    </Card>
   );
 }

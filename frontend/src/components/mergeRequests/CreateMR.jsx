@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { GitBranch, Sparkles, FolderGit2, ArrowRight } from "lucide-react";
+import { GitBranch, Sparkles } from "lucide-react";
 import { api } from "../../utils/api";
 import { Alert } from "../common/Alert";
 import { ProgressSteps } from "../common/ProgressSteps";
 import { motion } from "framer-motion";
-import { Loader } from "../common/Loader";
+import { Card, CardContent } from "../ui/Card";
+import { Button } from "../ui/Button";
+import { Select } from "../ui/Select";
 
 export function CreateMR({ token, project }) {
   const [branches, setBranches] = useState([]);
@@ -16,10 +18,27 @@ export function CreateMR({ token, project }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [progress, setProgress] = useState([]);
+  const [modelOptions, setModelOptions] = useState([
+    { label: "ChatGPT (GPT-4)", value: "chatgpt" },
+    { label: "Google Gemini", value: "gemini" },
+  ]);
 
   useEffect(() => {
     loadBranches();
+    loadModels();
   }, []);
+
+  const loadModels = async () => {
+    try {
+      const models = await api("/config/models", null, "GET");
+      if (models && Array.isArray(models)) {
+        setModelOptions(models.map((m) => ({ label: m.label, value: m.key })));
+      }
+    } catch (err) {
+      console.warn("Failed to load AI models from backend, using defaults:", err.message);
+      // Keep default models if API fails
+    }
+  };
 
   const loadBranches = async () => {
     setLoadingBranches(true);
@@ -56,26 +75,10 @@ export function CreateMR({ token, project }) {
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 800));
-      setProgress((p) =>
-        p.map((s, i) =>
-          i === 0
-            ? { ...s, status: "complete" }
-            : i === 1
-              ? { ...s, status: "active" }
-              : s
-        )
-      );
+      setProgress((p) => p.map((s, i) => (i === 0 ? { ...s, status: "complete" } : i === 1 ? { ...s, status: "active" } : s)));
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      setProgress((p) =>
-        p.map((s, i) =>
-          i <= 1
-            ? { ...s, status: "complete" }
-            : i === 2
-              ? { ...s, status: "active" }
-              : s
-        )
-      );
+      setProgress((p) => p.map((s, i) => (i <= 1 ? { ...s, status: "complete" } : i === 2 ? { ...s, status: "active" } : s)));
 
       const result = await api("/mr", {
         token,
@@ -86,15 +89,7 @@ export function CreateMR({ token, project }) {
 
       if (result.error) throw new Error(result.error);
 
-      setProgress((p) =>
-        p.map((s, i) =>
-          i <= 2
-            ? { ...s, status: "complete" }
-            : i === 3
-              ? { ...s, status: "active" }
-              : s
-        )
-      );
+      setProgress((p) => p.map((s, i) => (i <= 2 ? { ...s, status: "complete" } : i === 3 ? { ...s, status: "active" } : s)));
       await new Promise((resolve) => setTimeout(resolve, 1000));
       setProgress((p) => p.map((s) => ({ ...s, status: "complete" })));
 
@@ -112,8 +107,10 @@ export function CreateMR({ token, project }) {
     }
   };
 
+  const branchOptions = branches.map((b) => ({ label: b.name, value: b.name }));
+
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-xl mx-auto">
       {error && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <Alert type="error">{error}</Alert>
@@ -123,10 +120,8 @@ export function CreateMR({ token, project }) {
       {success && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <Alert type="success">
-            <div className="font-bold mb-1 text-white">
-              {success.message}
-            </div>
-            <div className="text-sm text-white/80">
+            <div className="font-bold mb-1">{success.message}</div>
+            <div className="text-sm opacity-90">
               MR #{success.iid} created
               {success.url && (
                 <>
@@ -135,18 +130,16 @@ export function CreateMR({ token, project }) {
                     href={success.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="underline hover:text-white font-semibold transition-colors"
+                    className="underline font-semibold transition-colors hover:brightness-110"
                   >
                     Open in GitLab →
                   </a>
                 </>
               )}
               {success.comments && (
-                <div className="mt-2 text-xs">
-                  💬 {success.comments.posted} of {success.comments.total} AI
-                  comments posted
-                  {success.comments.failed > 0 &&
-                    ` (${success.comments.failed} failed)`}
+                <div className="mt-2 text-xs opacity-90">
+                  💬 {success.comments.posted} of {success.comments.total} AI comments posted
+                  {success.comments.failed > 0 && ` (${success.comments.failed} failed)`}
                 </div>
               )}
             </div>
@@ -156,113 +149,68 @@ export function CreateMR({ token, project }) {
 
       {loading && progress.length > 0 && <ProgressSteps steps={progress} />}
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-panel p-8 rounded-2xl"
-      >
-        <div className="mb-6">
-          <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">
-            Source Branch <span className="text-accent-pink">*</span>
-          </label>
-          <div className="relative group">
-            <select
-              className="input-field appearance-none cursor-pointer hover:border-primary/50"
-              onChange={(e) => setSrc(e.target.value)}
-              disabled={loading || loadingBranches}
+      <Card className="p-8">
+        <CardContent>
+          <div className="space-y-6">
+            <Select
+              label="Source Branch"
               value={src}
-            >
-              <option value="" className="bg-background-secondary text-surface-muted">Select source branch</option>
-              {branches.map((b) => (
-                <option key={b.name} value={b.name} className="bg-background-secondary text-white">
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-surface-muted group-hover:text-primary transition-colors">
-              <ArrowRight size={16} className="rotate-90" />
-            </div>
-          </div>
-          <p className="text-xs text-surface-muted/60 mt-2 ml-1">The branch containing your changes</p>
-        </div>
-
-        <div className="mb-8">
-          <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">
-            Target Branch <span className="text-accent-pink">*</span>
-          </label>
-          <div className="relative group">
-            <select
-              className="input-field appearance-none cursor-pointer hover:border-primary/50"
-              onChange={(e) => setTgt(e.target.value)}
+              onChange={(e) => setSrc(e.target.value)}
+              options={branchOptions}
+              placeholder={loadingBranches ? "Loading branches..." : "Select source branch"}
               disabled={loading || loadingBranches}
+              required
+              helperText="The branch containing your changes"
+            />
+
+            <Select
+              label="Target Branch"
               value={tgt}
-            >
-              <option value="" className="bg-background-secondary text-surface-muted">Select target branch</option>
-              {branches.map((b) => (
-                <option key={b.name} value={b.name} className="bg-background-secondary text-white">
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-surface-muted group-hover:text-primary transition-colors">
-              <ArrowRight size={16} className="rotate-90" />
-            </div>
-          </div>
-          <p className="text-xs text-surface-muted/60 mt-2 ml-1">The branch to merge into</p>
-        </div>
+              onChange={(e) => setTgt(e.target.value)}
+              options={branchOptions}
+              placeholder={loadingBranches ? "Loading branches..." : "Select target branch"}
+              disabled={loading || loadingBranches}
+              required
+              helperText="The branch to merge into"
+            />
 
-        {src && tgt && src !== tgt && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="flex items-center gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl mb-6 text-sm text-primary-light"
-          >
-            <GitBranch size={18} className="text-primary" />
-            <span className="font-bold text-surface">{src}</span>
-            <span className="text-surface-muted">→</span>
-            <span className="font-bold text-surface">{tgt}</span>
-          </motion.div>
-        )}
+            {src && tgt && src !== tgt && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="flex items-center gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl text-sm text-primary-light"
+              >
+                <GitBranch size={18} className="text-primary shrink-0" />
+                <div className="flex flex-wrap items-center gap-2 overflow-hidden">
+                  <span className="font-bold text-surface truncate max-w-[120px]">{src}</span>
+                  <span className="text-surface-muted">→</span>
+                  <span className="font-bold text-surface truncate max-w-[120px]">{tgt}</span>
+                </div>
+              </motion.div>
+            )}
 
-        <div className="mb-8">
-          <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">AI Model</label>
-          <div className="relative group">
-            <select
-              className="input-field appearance-none cursor-pointer hover:border-primary/50"
-              onChange={(e) => setModel(e.target.value)}
-              disabled={loading}
+            <Select
+              label="AI Model"
               value={model}
-            >
-              <option value="chatgpt" className="bg-background-secondary text-surface">ChatGPT (GPT-4)</option>
-              <option value="gemini" className="bg-background-secondary text-surface">Google Gemini</option>
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-surface-muted group-hover:text-primary transition-colors">
-              <ArrowRight size={16} className="rotate-90" />
-            </div>
-          </div>
-        </div>
+              onChange={(e) => setModel(e.target.value)}
+              options={modelOptions}
+              disabled={loading}
+            />
 
-        <button
-          className={`w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl font-semibold text-white shadow-lg shadow-primary/20 border border-primary/50 transition-all ${loading || loadingBranches || !src || !tgt
-            ? "bg-primary/30 cursor-not-allowed shadow-none border-transparent text-white/50"
-            : "bg-primary hover:bg-primary-hover hover:scale-[1.01] active:scale-[0.98]"
-            }`}
-          onClick={create}
-          disabled={loading || loadingBranches || !src || !tgt}
-        >
-          {loading ? (
-            <>
-              <Loader size="sm" text="" />
-              <span className="ml-2">Creating...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles size={18} />
+            <Button
+              className="w-full mt-2"
+              onClick={create}
+              disabled={loading || loadingBranches || !src || !tgt}
+              isLoading={loading}
+              loadingText="Creating..."
+              icon={Sparkles}
+              size="lg"
+            >
               Create & Review MR
-            </>
-          )}
-        </button>
-      </motion.div>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
