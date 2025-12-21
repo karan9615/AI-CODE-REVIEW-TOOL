@@ -24,6 +24,67 @@ export const comment = async (token, pid, iid, body) =>
   client(token).post(`/projects/${pid}/merge_requests/${iid}/notes`, { body });
 
 /**
+ * Get merge requests for a project
+ * @param {string} token - GitLab API token
+ * @param {string|number} projectId - Project ID
+ * @param {object} options - Query options
+ * @returns {Promise<Array>} - Array of MR objects
+ */
+export const getMergeRequests = async (token, projectId, options = {}) => {
+  const {
+    state = "opened", // opened, closed, merged, all
+    scope = "all", // created_by_me, assigned_to_me, all
+    perPage = 50,
+    orderBy = "updated_at",
+    sort = "desc",
+  } = options;
+
+  try {
+    const response = await client(token).get(
+      `/projects/${projectId}/merge_requests`,
+      {
+        params: {
+          state,
+          scope,
+          per_page: perPage,
+          order_by: orderBy,
+          sort,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch merge requests:", error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get MRs assigned to the authenticated user across all projects
+ * @param {string} token - GitLab API token
+ * @returns {Promise<Array>} - Array of MR objects
+ */
+export const getMyAssignedMRs = async (token) => {
+  try {
+    const response = await client(token).get("/merge_requests", {
+      params: {
+        scope: "assigned_to_me",
+        state: "opened",
+        per_page: 100,
+        order_by: "updated_at",
+        sort: "desc",
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch assigned MRs:", error.message);
+    throw error;
+  }
+};
+
+/**
  * Parse a diff to build a complete line mapping
  * @param {object} diff - GitLab diff object
  * @returns {object} - Line mappings and metadata
@@ -139,9 +200,7 @@ export const createInlineComment = async (
         `Auto-corrected: ${filePath} line ${line} is a deletion, using old_line`
       );
     } else {
-      throw new Error(
-        `Line ${line} in ${filePath} is not a changed line (not added or deleted)`
-      );
+      throw new Error(`Line ${line} in ${filePath} is not a changed line`);
     }
   } else if (oldLine && !line) {
     // Deleted line
