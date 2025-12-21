@@ -107,7 +107,32 @@ r.post("/mr", validateToken, async (req, res) => {
 
     // 4️⃣ Fetch MR details to get diff_refs (SHAs)
     const mrDetails = await gl.getMRDetails(token, projectId, created.iid);
-    const { base_sha, start_sha, head_sha } = mrDetails.diff_refs || {};
+    let diffRefs = mrDetails.diff_refs || null;
+
+    if (!diffRefs?.base_sha || !diffRefs?.head_sha) {
+      diffRefs = await gl.getDiffRefsWithRetry(token, projectId, created.iid);
+    }
+
+    if (!diffRefs?.base_sha || !diffRefs?.head_sha) {
+      console.warn(
+        `diff_refs not available for MR #${created.iid}. Skipping inline comments.`
+      );
+
+      return res.json({
+        success: true,
+        iid: created.iid,
+        web_url: created.web_url,
+        comments: {
+          total: 0,
+          posted: 0,
+          failed: 0,
+          skipped: true,
+          reason: "diff_refs not ready yet",
+        },
+      });
+    }
+
+    const { base_sha, start_sha, head_sha } = diffRefs;
 
     if (!base_sha || !start_sha || !head_sha) {
       throw new Error("Missing diff_refs SHAs from MR details");
@@ -127,19 +152,34 @@ r.post("/mr", validateToken, async (req, res) => {
 
     for (const c of comments) {
       try {
-        await gl.createInlineComment(token, projectId, created.iid, {
-          ...c,
-          base_sha,
-          start_sha,
-          head_sha,
-        });
+        await gl.createInlineComment(
+          token,
+          projectId,
+          created.iid,
+          {
+            ...c,
+            base_sha,
+            start_sha,
+            head_sha,
+          },
+          mrDiffs
+        );
         successCount++;
       } catch (commentError) {
         console.error(
           `Failed to post comment on ${c.filePath}:`,
           commentError.message
         );
-        failCount++;
+        try {
+          await gl.comment(
+            token,
+            projectId,
+            created.iid,
+            `**Review (${c.filePath}):** ${c.comment}`
+          );
+        } catch (error) {
+          failCount++;
+        }
       }
     }
 
