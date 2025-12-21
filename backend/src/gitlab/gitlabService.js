@@ -6,7 +6,7 @@ export const getProjects = async (token) =>
 export const getBranches = async (token, projectId) =>
   (
     await client(token).get(
-      `/projects/${projectId}/repository/branches?per_page=100`
+      `/projects/${projectId}/repository/branches?per_page=100&sort=updated_desc`
     )
   ).data;
 
