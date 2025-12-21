@@ -1,4 +1,2 @@
-export const AI_MODELS = [
-  { key: "chatgpt", label: "ChatGPT (GPT-4) - Recommended" },
-  { key: "gemini", label: "Google Gemini Pro" },
-];
+// Re-export AI_MODELS from aiConfig for backward compatibility
+export { AI_MODELS } from "./aiConfig.js";

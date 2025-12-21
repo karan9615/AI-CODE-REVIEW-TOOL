@@ -10,6 +10,7 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
 import { Card, CardContent } from "../ui/Card";
+import { useModels } from "../../contexts/ModelsContext";
 
 export function ReviewMRs({ token, project }) {
   const [mrs, setMrs] = useState([]);
@@ -22,27 +23,13 @@ export function ReviewMRs({ token, project }) {
   const [showModelModal, setShowModelModal] = useState(false);
   const [selectedMR, setSelectedMR] = useState(null);
   const [selectedModel, setSelectedModel] = useState("chatgpt");
-  const [modelOptions, setModelOptions] = useState([
-    { label: "ChatGPT (GPT-4) - Recommended", value: "chatgpt" },
-    { label: "Google Gemini Pro", value: "gemini" },
-  ]);
+
+  // Get models from context (fetched once per session)
+  const { models: modelOptions } = useModels();
 
   useEffect(() => {
     loadMRs();
-    loadModels();
   }, []);
-
-  const loadModels = async () => {
-    try {
-      const models = await api("/config/models", null, "GET");
-      if (models && Array.isArray(models)) {
-        setModelOptions(models.map((m) => ({ label: m.label, value: m.key })));
-      }
-    } catch (err) {
-      console.warn("Failed to load AI models from backend, using defaults:", err.message);
-      // Keep default models if API fails
-    }
-  };
 
   const loadMRs = async () => {
     setLoading(true);

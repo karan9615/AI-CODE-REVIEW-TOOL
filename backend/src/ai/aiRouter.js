@@ -1,19 +1,15 @@
-import { chatgptRun } from "./chatgptAdapter.js";
-import { geminiRun } from "./geminiAdapter.js";
+import { AIService } from "./AIService.js";
 
-export async function runAI(model, prompt) {
+/**
+ * Run AI generation with specified model
+ * @param {string} modelKey - The model key (e.g., "gpt-4", "gemini-pro")
+ * @param {string} prompt - The prompt to send
+ * @returns {Promise<string>} The generated response
+ */
+export async function runAI(modelKey, prompt) {
   if (!prompt || typeof prompt !== "string") {
     throw new Error("Invalid AI prompt");
   }
 
-  switch (model) {
-    case "chatgpt":
-      return await chatgptRun(prompt);
-
-    case "gemini":
-      return await geminiRun(prompt);
-
-    default:
-      throw new Error(`Unsupported AI model: ${model}`);
-  }
+  return await AIService.generate(modelKey, prompt);
 }

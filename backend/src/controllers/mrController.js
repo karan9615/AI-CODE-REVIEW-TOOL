@@ -3,12 +3,7 @@ import {
   generateMRContent,
   generateInlineReviews,
 } from "../review/reviewService.js";
-import { AI_MODELS } from "../config/models.js";
-
-const validateModel = (model) => {
-  const validModels = AI_MODELS.map((m) => m.key);
-  return validModels.includes(model);
-};
+import { isValidModel, getValidModelKeys } from "../config/aiConfig.js";
 
 export const createMR = async (req, res) => {
   try {
@@ -18,9 +13,9 @@ export const createMR = async (req, res) => {
     if (!projectId) {
       return res.status(400).json({ error: "projectId is required" });
     }
-    if (!model || !validateModel(model)) {
+    if (!model || !isValidModel(model)) {
       return res.status(400).json({
-        error: `Valid model is required. Available: ${AI_MODELS.map((m) => m.key).join(", ")}`,
+        error: `Valid model is required. Available: ${getValidModelKeys().join(", ")}`,
       });
     }
     if (!mr || !mr.source_branch || !mr.target_branch) {
@@ -179,9 +174,9 @@ export const reviewMR = async (req, res) => {
     if (!mrIid) {
       return res.status(400).json({ error: "mrIid is required" });
     }
-    if (!model || !validateModel(model)) {
+    if (!model || !isValidModel(model)) {
       return res.status(400).json({
-        error: `Valid model is required. Available: ${AI_MODELS.map((m) => m.key).join(", ")}`,
+        error: `Valid model is required. Available: ${getValidModelKeys().join(", ")}`,
       });
     }
 

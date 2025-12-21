@@ -4,6 +4,7 @@ import { ProjectSelector } from "./components/projects/ProjectSelector";
 import { MainApp } from "./components/layout/MainApp";
 import { api } from "./utils/api";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ModelsProvider } from "./contexts/ModelsContext";
 
 export default function App() {
   const [user, setUser] = useState("");
@@ -51,33 +52,35 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      {!projects.length ? (
-        <LoginView
-          user={user}
-          setUser={setUser}
-          token={token}
-          setToken={setToken}
-          loading={loading}
-          error={error}
-          load={load}
-          handleKeyPress={handleKeyPress}
-        />
-      ) : !project ? (
-        <ProjectSelector
-          projects={projects}
-          setProject={setProject}
-          logout={logout}
-        />
-      ) : (
-        <MainApp
-          token={token}
-          project={project}
-          view={view}
-          setView={setView}
-          onBack={() => setProject(null)}
-          logout={logout}
-        />
-      )}
+      <ModelsProvider>
+        {!projects.length ? (
+          <LoginView
+            user={user}
+            setUser={setUser}
+            token={token}
+            setToken={setToken}
+            loading={loading}
+            error={error}
+            load={load}
+            handleKeyPress={handleKeyPress}
+          />
+        ) : !project ? (
+          <ProjectSelector
+            projects={projects}
+            setProject={setProject}
+            logout={logout}
+          />
+        ) : (
+          <MainApp
+            token={token}
+            project={project}
+            view={view}
+            setView={setView}
+            onBack={() => setProject(null)}
+            logout={logout}
+          />
+        )}
+      </ModelsProvider>
     </ThemeProvider>
   );
 }

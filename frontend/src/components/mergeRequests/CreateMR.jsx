@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
+import { useModels } from "../../contexts/ModelsContext";
 
 export function CreateMR({ token, project }) {
   const [branches, setBranches] = useState([]);
@@ -18,27 +19,13 @@ export function CreateMR({ token, project }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [progress, setProgress] = useState([]);
-  const [modelOptions, setModelOptions] = useState([
-    { label: "ChatGPT (GPT-4)", value: "chatgpt" },
-    { label: "Google Gemini", value: "gemini" },
-  ]);
+
+  // Get models from context (fetched once per session)
+  const { models: modelOptions } = useModels();
 
   useEffect(() => {
     loadBranches();
-    loadModels();
   }, []);
-
-  const loadModels = async () => {
-    try {
-      const models = await api("/config/models", null, "GET");
-      if (models && Array.isArray(models)) {
-        setModelOptions(models.map((m) => ({ label: m.label, value: m.key })));
-      }
-    } catch (err) {
-      console.warn("Failed to load AI models from backend, using defaults:", err.message);
-      // Keep default models if API fails
-    }
-  };
 
   const loadBranches = async () => {
     setLoadingBranches(true);
