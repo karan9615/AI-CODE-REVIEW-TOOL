@@ -1,8 +1,22 @@
-# GitLab MR AI Review - Modern UI
+# GitLab MR AI Review – Frontend
 
 A modern, industry-level React application for AI-powered GitLab merge request reviews.
 
 ## 📁 Project Structure
+
+## 🧩 Extending AI Models/Providers
+
+- The frontend fetches available AI models from the backend.
+- To add new models or providers, update the backend (see `../backend/README.md`).
+- No frontend code changes are needed unless you want to customize model selection UI.
+
+## ⚡ Quick Start
+
+```sh
+cd frontend
+npm install
+npm run dev
+```
 
 ```
 src/
@@ -77,26 +91,14 @@ src/
 - Consistent spacing and typography
 - Responsive design patterns
 
-## 📦 Installation
-
-```bash
-npm install
-```
-
 ## 🔧 Configuration
 
-Update the API endpoint in `src/utils/api.js`:
+Update the API endpoint in `src/utils/api.js` if your backend is not running on localhost:3001.
 
 ```javascript
 const response = await fetch("YOUR_API_ENDPOINT" + path, {
   // ...
 });
-```
-
-## 🏃 Running
-
-```bash
-npm run dev
 ```
 
 ## 🔌 Backend API Endpoints Required
