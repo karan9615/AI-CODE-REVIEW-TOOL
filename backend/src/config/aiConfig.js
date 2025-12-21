@@ -22,7 +22,7 @@ export const AI_PROVIDERS = {
           temperature: 0.2,
           maxTokens: 4000,
         },
-        recommended: true,
+        recommended: false,
       },
       {
         key: "gpt-4-turbo",
@@ -60,7 +60,7 @@ export const AI_PROVIDERS = {
           model: "gemini-2.5-flash",
           temperature: 0.2,
         },
-        recommended: false,
+        recommended: true,
       },
       {
         key: "gemini-flash",

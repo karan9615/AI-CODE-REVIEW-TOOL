@@ -16,7 +16,7 @@ const PROVIDER_REGISTRY = {
 
 /**
  * AI Service - Unified interface for all AI providers
- * 
+ *
  * This service automatically routes requests to the correct provider
  * based on the model key. Adding new providers is as simple as:
  * 1. Creating a provider class in providers/
@@ -34,7 +34,7 @@ export class AIService {
   static async generate(modelKey, prompt, customConfig = {}) {
     // Get model configuration
     const modelConfig = getModelConfig(modelKey);
-    
+
     if (!modelConfig) {
       throw new Error(
         `Invalid model key: "${modelKey}". Please check available models in configuration.`
@@ -43,7 +43,7 @@ export class AIService {
 
     // Get the provider instance
     const provider = PROVIDER_REGISTRY[modelConfig.provider];
-    
+
     if (!provider) {
       throw new Error(
         `Provider "${modelConfig.provider}" not found in registry. Please add it to PROVIDER_REGISTRY.`
@@ -63,7 +63,9 @@ export class AIService {
       ...customConfig,
     };
 
-    console.log(`🤖 Generating with ${provider.name} (${modelConfig.config.model})...`);
+    console.log(
+      `🤖 Generating with ${provider.name} (${modelConfig.config.model})...`
+    );
 
     // Generate using the provider
     return await provider.generate(prompt, finalConfig);
@@ -91,8 +93,8 @@ export class AIService {
   static async getAvailableModels() {
     const { getAvailableModels } = await import("../config/aiConfig.js");
     const allModels = getAvailableModels();
-    
-    return allModels.filter(model => {
+
+    return allModels.filter((model) => {
       const provider = PROVIDER_REGISTRY[model.provider];
       return provider && provider.isAvailable();
     });
