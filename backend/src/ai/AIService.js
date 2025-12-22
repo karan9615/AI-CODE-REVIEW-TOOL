@@ -68,7 +68,42 @@ export class AIService {
     );
 
     // Generate using the provider
-    return await provider.generate(prompt, finalConfig);
+    const rawResponse = await provider.generate(prompt, finalConfig);
+
+    // If schema is provided, we guarantee an object response
+    if (
+      finalConfig.responseSchema ||
+      finalConfig.responseMimeType === "application/json"
+    ) {
+      return this.parseStructuredOutput(rawResponse);
+    }
+
+    return rawResponse;
+  }
+
+  /**
+   * Safe JSON parser for AI responses.
+   * Handles markdown code blocks and common formatting issues.
+   * @param {string} response - Raw AI response string
+   * @returns {Object|Array} Parsed JSON
+   */
+  static parseStructuredOutput(response) {
+    try {
+      // 1. Try direct parse
+      return JSON.parse(response);
+    } catch (e) {
+      // 2. Clean Markdown and retry
+      const clean = response
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
+      try {
+        return JSON.parse(clean);
+      } catch (error) {
+        console.error("❌ Failed to parse AI JSON response:", response);
+        throw new Error("AI response was not valid JSON despite strict mode.");
+      }
+    }
   }
 
   /**

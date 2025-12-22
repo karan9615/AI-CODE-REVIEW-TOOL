@@ -34,7 +34,9 @@ export class OpenAIProvider {
    */
   async generate(prompt, config = {}) {
     if (!this.isAvailable()) {
-      throw new Error("OpenAI provider not configured. Please set OPENAI_API_KEY.");
+      throw new Error(
+        "OpenAI provider not configured. Please set OPENAI_API_KEY."
+      );
     }
 
     const {
@@ -43,6 +45,7 @@ export class OpenAIProvider {
       maxTokens = 4000,
       systemPrompt = "You are a helpful senior software engineer. Follow instructions strictly and return structured output when requested.",
       responseMimeType,
+      responseSchema,
     } = config;
 
     const completionConfig = {
@@ -61,13 +64,24 @@ export class OpenAIProvider {
       ],
     };
 
-    // Map application/json to OpenAI's JSON mode
-    if (responseMimeType === "application/json") {
+    // Map application/json to OpenAI's JSON mode or Schema
+    if (responseSchema) {
+      completionConfig.response_format = {
+        type: "json_schema",
+        json_schema: {
+          name: "response_data",
+          strict: true,
+          schema: responseSchema,
+        },
+      };
+    } else if (responseMimeType === "application/json") {
       completionConfig.response_format = { type: "json_object" };
     }
 
     try {
-      const response = await this.client.chat.completions.create(completionConfig);
+      const response = await this.client.chat.completions.create(
+        completionConfig
+      );
 
       return response.choices[0].message.content;
     } catch (error) {

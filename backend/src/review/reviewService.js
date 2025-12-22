@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import { runAI } from "../ai/aiRouter.js";
 
+import { mrContentSchema, inlineReviewSchema } from "./reviewSchemas.js";
+
 const rules = JSON.parse(
   fs.readFileSync(
     path.join(process.cwd(), "config", "review.rules.json"),
@@ -53,24 +55,20 @@ ${JSON.stringify(rules)}
 ### Code Diffs
 ${JSON.stringify(diffs)}
 
-### Output Format (STRICT JSON, no markdown, no extra text)
-{
-  "title": "string",
-  "description": "string"
-}
-
-Return ONLY valid JSON. No explanations. No markdown.
+### Output Format
+The output will be strictly validated against a JSON schema.
 `;
 
   try {
-    const response = await runAI(model, prompt, {
-      responseMimeType: "application/json",
+    // AIService now returns the parsed object directly
+    return await runAI(model, prompt, {
+      responseSchema: mrContentSchema,
     });
-    return extractJson(response);
-  } catch {
+  } catch (error) {
+    console.error("❌ MR Content Generation Failed:", error.message);
     return {
       title: "MR content create changes",
-      description: "AI review failed to parse.",
+      description: "AI review failed to generate content.",
     };
   }
 }
@@ -183,48 +181,17 @@ ${JSON.stringify(enrichedDiffs, null, 2)}
 ### REVIEW RULES
 ${JSON.stringify(rules, null, 2)}
 
-### OUTPUT FORMAT (STRICT JSON)
-
-Return a JSON array with **detailed, actionable comments**:
-
-[
-  {
-    "filePath": "path/to/file.js",
-    "line": 42,
-    "severity": "critical|high|medium|low",
-    "comment": "**[Issue Type]**: Detailed explanation of the problem. **Why it matters**: Impact. **Suggested fix**: Specific code or approach."
-  }
-]
-
-### CRITICAL INSTRUCTIONS
-- **Be specific**: Reference actual variable names, function names, and logic from the code
-- **Explain impact**: Don't just say "bad practice" - explain the real-world consequence
-- **Provide solutions**: Always suggest a concrete fix
-- **Use severity levels**: Mark critical security/data issues as "critical"
-- **Focus on substance**: Skip trivial style comments unless they affect readability
-- **Reference context**: Use the contextLines to understand the full picture before commenting
-- **For added lines**: use "line" field with the "newLine" value
-- **For deleted lines**: use "oldLine" field with the "oldLine" value
-
-### EXAMPLE OF A GOOD COMMENT
-{
-  "filePath": "src/api/userService.js",
-  "line": 23,
-  "severity": "critical",
-  "comment": "**SQL Injection Risk**: The query concatenates user input directly without parameterization. **Why it matters**: An attacker could execute arbitrary SQL (e.g., \`1' OR '1'='1\`). **Suggested fix**: Use parameterized queries: \`db.query('SELECT * FROM users WHERE id = ?', [userId])\`"
-}
-
-Return ONLY a JSON array. No markdown. No explanations.
+### OUTPUT FORMAT
+The output will be strictly validated against a JSON schema.
 `;
 
   try {
-    const response = await runAI(model, prompt, {
-      responseMimeType: "application/json",
+    const comments = await runAI(model, prompt, {
+      responseSchema: inlineReviewSchema,
     });
-    const comments = extractJson(response);
 
     if (!Array.isArray(comments)) {
-      console.warn("AI did not return an array");
+      console.warn("AI returned valid JSON but not an array");
       return [];
     }
 
@@ -301,37 +268,10 @@ Return ONLY a JSON array. No markdown. No explanations.
     );
     return validComments;
   } catch (error) {
-    console.error("❌ Failed to generate inline reviews:", error.message);
+    console.error(
+      "❌ Unexpected error in generateInlineReviews:",
+      error.message
+    );
     return [];
-  }
-}
-
-/**
- * Extract JSON safely from AI response
- */
-function extractJson(response) {
-  // 1. Remove markdown code blocks if present
-  let cleanResponse = response.replace(/```json/g, "").replace(/```/g, "");
-
-  // 2. Try parsing the cleaned response
-  try {
-    return JSON.parse(cleanResponse);
-  } catch {
-    // 3. Fallback: Try to find JSON object/array patterns
-    const arrMatch = response.match(/\[[\s\S]*\]/);
-    if (arrMatch) {
-      try {
-        return JSON.parse(arrMatch[0]);
-      } catch {}
-    }
-
-    const objMatch = response.match(/\{[\s\S]*\}/);
-    if (objMatch) {
-      try {
-        return JSON.parse(objMatch[0]);
-      } catch {}
-    }
-
-    throw new Error("No valid JSON found in AI response");
   }
 }

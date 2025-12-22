@@ -1,5 +1,6 @@
 import envConfig from "../../../config/envConfig.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { toGeminiSchema } from "../utils/schemaConverter.js";
 
 const apiKey = envConfig.geminiApiKey;
 
@@ -40,9 +41,10 @@ export class GoogleProvider {
     }
 
     const {
-      model = "gemini-2.5-flash",
+      model = "gemini-1.5-flash",
       temperature = 0.2,
       responseMimeType,
+      responseSchema,
     } = config;
 
     try {
@@ -52,6 +54,11 @@ export class GoogleProvider {
 
       if (responseMimeType) {
         generationConfig.responseMimeType = responseMimeType;
+      }
+
+      if (responseSchema) {
+        generationConfig.responseSchema = toGeminiSchema(responseSchema);
+        generationConfig.responseMimeType = "application/json";
       }
 
       const geminiModel = this.client.getGenerativeModel({
