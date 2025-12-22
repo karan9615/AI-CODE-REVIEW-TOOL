@@ -34,20 +34,29 @@ export class GoogleProvider {
    */
   async generate(prompt, config = {}) {
     if (!this.isAvailable()) {
-      throw new Error("Google provider not configured. Please set GEMINI_API_KEY.");
+      throw new Error(
+        "Google provider not configured. Please set GEMINI_API_KEY."
+      );
     }
 
     const {
       model = "gemini-2.5-flash",
       temperature = 0.2,
+      responseMimeType,
     } = config;
 
     try {
+      const generationConfig = {
+        temperature,
+      };
+
+      if (responseMimeType) {
+        generationConfig.responseMimeType = responseMimeType;
+      }
+
       const geminiModel = this.client.getGenerativeModel({
         model,
-        generationConfig: {
-          temperature,
-        },
+        generationConfig,
       });
 
       const result = await geminiModel.generateContent(prompt);

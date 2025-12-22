@@ -63,7 +63,9 @@ Return ONLY valid JSON. No explanations. No markdown.
 `;
 
   try {
-    const response = await runAI(model, prompt);
+    const response = await runAI(model, prompt, {
+      responseMimeType: "application/json",
+    });
     return extractJson(response);
   } catch {
     return {
@@ -216,7 +218,9 @@ Return ONLY a JSON array. No markdown. No explanations.
 `;
 
   try {
-    const response = await runAI(model, prompt);
+    const response = await runAI(model, prompt, {
+      responseMimeType: "application/json",
+    });
     const comments = extractJson(response);
 
     if (!Array.isArray(comments)) {
@@ -306,13 +310,28 @@ Return ONLY a JSON array. No markdown. No explanations.
  * Extract JSON safely from AI response
  */
 function extractJson(response) {
+  // 1. Remove markdown code blocks if present
+  let cleanResponse = response.replace(/```json/g, "").replace(/```/g, "");
+
+  // 2. Try parsing the cleaned response
   try {
-    return JSON.parse(response);
+    return JSON.parse(cleanResponse);
   } catch {
+    // 3. Fallback: Try to find JSON object/array patterns
     const arrMatch = response.match(/\[[\s\S]*\]/);
-    if (arrMatch) return JSON.parse(arrMatch[0]);
+    if (arrMatch) {
+      try {
+        return JSON.parse(arrMatch[0]);
+      } catch {}
+    }
+
     const objMatch = response.match(/\{[\s\S]*\}/);
-    if (objMatch) return JSON.parse(objMatch[0]);
-    throw new Error("No JSON found in AI response");
+    if (objMatch) {
+      try {
+        return JSON.parse(objMatch[0]);
+      } catch {}
+    }
+
+    throw new Error("No valid JSON found in AI response");
   }
 }

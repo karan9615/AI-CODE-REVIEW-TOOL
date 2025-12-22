@@ -6,10 +6,10 @@ import { AIService } from "./AIService.js";
  * @param {string} prompt - The prompt to send
  * @returns {Promise<string>} The generated response
  */
-export async function runAI(modelKey, prompt) {
+export async function runAI(modelKey, prompt, config = {}) {
   if (!prompt || typeof prompt !== "string") {
     throw new Error("Invalid AI prompt");
   }
 
-  return await AIService.generate(modelKey, prompt);
+  return await AIService.generate(modelKey, prompt, config);
 }

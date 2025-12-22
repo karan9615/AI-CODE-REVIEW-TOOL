@@ -42,24 +42,32 @@ export class OpenAIProvider {
       temperature = 0.2,
       maxTokens = 4000,
       systemPrompt = "You are a helpful senior software engineer. Follow instructions strictly and return structured output when requested.",
+      responseMimeType,
     } = config;
 
+    const completionConfig = {
+      model,
+      temperature,
+      max_tokens: maxTokens,
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    };
+
+    // Map application/json to OpenAI's JSON mode
+    if (responseMimeType === "application/json") {
+      completionConfig.response_format = { type: "json_object" };
+    }
+
     try {
-      const response = await this.client.chat.completions.create({
-        model,
-        temperature,
-        max_tokens: maxTokens,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      });
+      const response = await this.client.chat.completions.create(completionConfig);
 
       return response.choices[0].message.content;
     } catch (error) {
