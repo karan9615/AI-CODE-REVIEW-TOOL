@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { RefreshCw, FileCode } from "lucide-react";
+import { RefreshCw, FileCode, Sparkles } from "lucide-react";
 import { api } from "../../utils/api";
 import { Alert } from "../common/Alert";
 import { ProgressSteps } from "../common/ProgressSteps";
@@ -115,41 +115,118 @@ export function ReviewMRs({ token, project }) {
 
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
-          <h3 className="text-2xl font-bold text-surface mb-2">Assigned Merge Requests</h3>
-          <p className="text-surface-muted">Review open MRs with AI assistance</p>
-        </div>
-        <Button onClick={loadMRs} disabled={loading} variant="secondary" icon={RefreshCw} size="sm">
-          Refresh
-        </Button>
-      </div>
+    <div className="w-full max-w-3xl mx-auto">
+      <Card className="overflow-hidden border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl min-h-[600px]">
+        {/* Decorative Grid Background */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light"></div>
 
-      {error && (
-        <div className="mb-6">
-          <Alert type="error">{error}</Alert>
-        </div>
-      )}
-
-      {reviewSuccess && (
-        <div className="mb-6">
-          <Alert type="success">
-            <div>
-              <div className="font-bold">Review completed for MR #{reviewSuccess.iid}</div>
-              {reviewSuccess.comments && (
-                <div className="text-sm mt-1 opacity-80">
-                  💬 {reviewSuccess.comments.posted} of {reviewSuccess.comments.total} comments posted
-                  {reviewSuccess.comments.failed > 0 && ` (${reviewSuccess.comments.failed} failed)`}
-                </div>
-              )}
+        {/* Header Section */}
+        <div className="relative p-8 border-b border-border-color/10 bg-background-secondary/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-accent-cyan/10 flex items-center justify-center text-accent-cyan shadow-inner">
+              <FileCode size={24} />
             </div>
-          </Alert>
+            <div>
+              <h3 className="text-xl font-bold text-surface">Merge Requests</h3>
+              <p className="text-surface-muted text-sm">Select an MR to review with AI</p>
+            </div>
+          </div>
+          <Button
+            onClick={loadMRs}
+            disabled={loading}
+            variant="secondary"
+            size="sm"
+            className="shrink-0 rounded-full px-4 font-medium text-sm gap-2 hover:bg-surface-muted/20"
+            icon={RefreshCw}
+          >
+            Refresh
+          </Button>
         </div>
-      )}
 
-      {/* Progress Steps */}
-      {reviewing && progress.length > 0 && <ProgressSteps steps={progress} />}
+        <CardContent className="p-0 relative z-10">
+          {error && (
+            <div className="p-8 pb-0">
+              <Alert type="error">{error}</Alert>
+            </div>
+          )}
+
+          {reviewSuccess && (
+            <div className="p-8 pb-0">
+              <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+                <Alert type="success">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-bold">Review Complete for MR #{reviewSuccess.iid}</span>
+                    <span className="text-sm opacity-90">
+                      {reviewSuccess.comments?.posted} comments posted successfully.
+                    </span>
+                  </div>
+                </Alert>
+              </motion.div>
+            </div>
+          )}
+
+          {/* Progress Steps Overlay */}
+          <AnimatePresence>
+            {reviewing && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-50 bg-background/80 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center"
+              >
+                <div className="w-full max-w-md">
+                  <div className="mb-8 w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center text-primary relative">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                      className="absolute inset-0 border-2 border-primary/30 border-t-transparent rounded-full"
+                    />
+                    <Sparkles size={32} />
+                  </div>
+                  <ProgressSteps steps={progress} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="p-6 sm:p-8 space-y-4">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 space-y-4 text-surface-muted">
+                <Loader size="lg" text="" />
+                <p>Fetching merge requests...</p>
+              </div>
+            ) : mrs.length === 0 ? (
+              <div className="text-center py-20 px-4">
+                <div className="w-16 h-16 mx-auto bg-surface-muted/10 rounded-full flex items-center justify-center text-surface-muted mb-4">
+                  <FileCode size={32} opacity={0.5} />
+                </div>
+                <h3 className="text-lg font-semibold text-surface mb-2">No Open Merge Requests</h3>
+                <p className="text-sm text-surface-muted max-w-xs mx-auto">
+                  There are no open merge requests in this project. Create one to get started!
+                </p>
+              </div>
+            ) : (
+              <motion.div layout className="grid grid-cols-1 gap-4">
+                {mrs.map((mr) => (
+                  <MRCard
+                    key={mr.iid}
+                    mr={mr}
+                    onReview={handleReviewClick}
+                    isReviewing={reviewing === mr.iid}
+                  />
+                ))}
+              </motion.div>
+            )}
+          </div>
+        </CardContent>
+
+        {/* Modal remains unchanged logically but structurally inside the fragment if needed, 
+            though it renders via Portal usually or absolute. 
+            We'll stick to keeping the Modal code as is but just outside this main return block 
+            or ensure it's still in the component tree.
+            Wait, I am replacing the return block of ReviewMRs. 
+            I need to keep the Modal rendering. */}
+      </Card>
 
       {/* Model Selection Modal */}
       <Modal
@@ -183,32 +260,11 @@ export function ReviewMRs({ token, project }) {
           <Button variant="ghost" onClick={() => setShowModelModal(false)} className="flex-1">
             Cancel
           </Button>
-          <Button onClick={startReview} className="flex-1">
+          <Button onClick={startReview} className="flex-1" icon={Sparkles}>
             Start AI Review
           </Button>
         </div>
       </Modal>
-
-      {mrs.length === 0 ? (
-        <Card className="text-center py-16">
-          <CardContent>
-            <FileCode className="w-12 h-12 text-surface-muted/50 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-surface mb-2">No merge requests found</h3>
-            <p className="text-sm text-surface-muted">Create a new MR or check back later</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <motion.div layout className="space-y-4">
-          {mrs.map((mr) => (
-            <MRCard
-              key={mr.iid}
-              mr={mr}
-              onReview={handleReviewClick}
-              isReviewing={reviewing === mr.iid}
-            />
-          ))}
-        </motion.div>
-      )}
     </div>
   );
 }

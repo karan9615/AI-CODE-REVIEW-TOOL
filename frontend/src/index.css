@@ -72,8 +72,8 @@
 
   /* Dark mode override for background mesh */
   .dark body::before {
-    background: radial-gradient(circle at 80% 20%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at 0% 50%, rgba(8, 145, 178, 0.1) 0%, transparent 50%);
+    background: radial-gradient(circle at 80% 20%, rgba(124, 58, 237, 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 0% 50%, rgba(8, 145, 178, 0.05) 0%, transparent 50%);
   }
 }
 

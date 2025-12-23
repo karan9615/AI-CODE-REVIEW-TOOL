@@ -5,52 +5,59 @@ import { Button } from "../ui/Button";
 
 export function MRCard({ mr, onReview, isReviewing }) {
   return (
-    <Card className="p-6 hover:border-primary/30 transition-all group">
-      <div className="flex items-start gap-4 mb-4">
-        <span className="bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 font-mono shadow-[0_0_10px_rgba(124,58,237,0.1)]">
-          #{mr.iid}
-        </span>
-        <h4 className="text-base font-bold text-surface leading-tight group-hover:text-primary-light transition-colors">
-          {mr.title}
-        </h4>
-      </div>
+    <Card className="p-5 hover:bg-background-tertiary/30 transition-all group border-border-color/10 hover:border-primary/20">
+      <div className="flex flex-col sm:flex-row gap-5 justify-between items-start sm:items-center">
+        <div className="space-y-2 min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xs font-bold text-primary/80 bg-primary/10 px-2 py-0.5 rounded">
+              #{mr.iid}
+            </span>
+            <div className="flex items-center gap-2 text-xs text-surface-muted truncate">
+              {mr.source_branch}
+              <span className="text-surface-muted/40">→</span>
+              {mr.target_branch}
+            </div>
+          </div>
 
-      <div className="flex flex-wrap gap-4 text-sm text-surface-muted mb-6">
-        <span className="flex items-center gap-2 px-3 py-1.5 bg-background-tertiary/50 rounded-lg border border-border-color/10">
-          <GitBranch size={14} className="text-surface-muted" />
-          <span className="font-mono text-xs text-surface/90">{mr.source_branch}</span>
-          <span className="text-surface-muted/50">→</span>
-          <span className="font-mono text-xs text-surface/90">{mr.target_branch}</span>
-        </span>
-        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-background-tertiary/50 rounded-lg border border-border-color/10">
-          <MessageSquare size={14} className="text-surface-muted" />
-          <span className="text-surface/90">{mr.user_notes_count || 0} comments</span>
-        </span>
-      </div>
+          <h4 className="text-base font-bold text-surface leading-tight hover:text-primary transition-colors cursor-pointer line-clamp-1" onClick={() => window.open(mr.web_url, '_blank')}>
+            {mr.title}
+          </h4>
 
-      <div className="flex gap-3">
-        {mr.web_url && (
+          <div className="flex items-center gap-4 text-xs text-surface-muted font-medium">
+            <div className="flex items-center gap-1.5">
+              <MessageSquare size={14} className="text-surface-muted/70" />
+              {mr.user_notes_count} <span className="hidden sm:inline">comments</span>
+            </div>
+            {mr.author && (
+              <div className="flex items-center gap-1.5 text-surface-muted/70">
+                <span>by {mr.author.name}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0">
           <Button
+            variant="ghost"
+            size="sm"
+            className="!p-2 text-surface-muted hover:text-surface"
             href={mr.web_url}
             target="_blank"
-            rel="noopener noreferrer"
-            variant="secondary"
-            icon={ExternalLink}
-            className="flex-1"
           >
-            View in GitLab
+            <ExternalLink size={18} />
           </Button>
-        )}
-        <Button
-          onClick={() => onReview(mr)}
-          disabled={isReviewing}
-          isLoading={isReviewing}
-          loadingText="Reviewing..."
-          icon={Sparkles}
-          className="flex-1"
-        >
-          AI Review
-        </Button>
+          <Button
+            onClick={() => onReview(mr)}
+            disabled={isReviewing}
+            isLoading={isReviewing}
+            loadingText="Reviewing"
+            icon={Sparkles}
+            size="sm"
+            className="flex-1 sm:flex-initial shadow-lg shadow-primary/10"
+          >
+            Review
+          </Button>
+        </div>
       </div>
     </Card>
   );

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { GitBranch, Sparkles } from "lucide-react";
+import { GitBranch, Sparkles, ArrowRight as ArrowIcon } from "lucide-react";
 import { api } from "../../utils/api";
 import { Alert } from "../common/Alert";
 import { ProgressSteps } from "../common/ProgressSteps";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
@@ -20,7 +20,7 @@ export function CreateMR({ token, project }) {
   const [success, setSuccess] = useState(null);
   const [progress, setProgress] = useState([]);
 
-  // Get models from context (fetched once per session)
+  // Get models from context
   const { models: modelOptions } = useModels();
 
   useEffect(() => {
@@ -41,14 +41,8 @@ export function CreateMR({ token, project }) {
   };
 
   const create = async () => {
-    if (!src || !tgt) {
-      setError("Please select both source and target branches");
-      return;
-    }
-    if (src === tgt) {
-      setError("Source and target branches must be different");
-      return;
-    }
+    if (!src || !tgt) return setError("Please select both source and target branches");
+    if (src === tgt) return setError("Source and target branches must be different");
 
     setLoading(true);
     setError(null);
@@ -81,11 +75,14 @@ export function CreateMR({ token, project }) {
       setProgress((p) => p.map((s) => ({ ...s, status: "complete" })));
 
       setSuccess({
-        message: "Merge request created successfully!",
+        message: "Merge Request Created",
         iid: result.iid,
         url: result.web_url,
         comments: result.comments,
       });
+      // Reset form slightly but keep success state visible
+      setSrc("");
+      setTgt("");
     } catch (err) {
       setError(err.message || "Failed to create merge request");
       setProgress([]);
@@ -97,104 +94,179 @@ export function CreateMR({ token, project }) {
   const branchOptions = branches.map((b) => ({ label: b.name, value: b.name }));
 
   return (
-    <div className="max-w-xl mx-auto">
-      {error && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <Alert type="error">{error}</Alert>
-        </motion.div>
-      )}
+    <div className="w-full max-w-3xl mx-auto">
+      <Card className="overflow-hidden border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl">
+        {/* Decorative Grid Background */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light"></div>
 
-      {success && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <Alert type="success">
-            <div className="font-bold mb-1">{success.message}</div>
-            <div className="text-sm opacity-90">
-              MR #{success.iid} created
-              {success.url && (
-                <>
-                  {" · "}
-                  <a
-                    href={success.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline font-semibold transition-colors hover:brightness-110"
-                  >
-                    Open in GitLab →
-                  </a>
-                </>
-              )}
-              {success.comments && (
-                <div className="mt-2 text-xs opacity-90">
-                  💬 {success.comments.posted} of {success.comments.total} AI comments posted
-                  {success.comments.failed > 0 && ` (${success.comments.failed} failed)`}
-                </div>
-              )}
+        {/* Header Section */}
+        <div className="relative p-8 border-b border-border-color/10 bg-background-secondary/50">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+              <Sparkles size={24} />
             </div>
-          </Alert>
-        </motion.div>
-      )}
+            <div>
+              <h2 className="text-xl font-bold text-surface">New Merge Request</h2>
+              <p className="text-surface-muted text-sm">Select branches to analyze and merge</p>
+            </div>
+          </div>
+        </div>
 
-      {loading && progress.length > 0 && <ProgressSteps steps={progress} />}
+        <CardContent className="p-0 relative min-h-[400px]">
+          {/* Main Content Area */}
+          <div className="p-8 sm:p-10 relative z-10">
+            <AnimatePresence mode="wait">
+              {loading ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.05 }}
+                  className="flex flex-col items-center justify-center py-8"
+                >
+                  <div className="w-full max-w-md">
+                    <ProgressSteps steps={progress} />
+                    <div className="text-center mt-6 text-surface-muted animate-pulse">
+                      Please wait while AI analyzes your code...
+                    </div>
+                  </div>
+                </motion.div>
+              ) : success ? (
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center justify-center py-8 text-center"
+                >
+                  <div className="w-20 h-20 bg-accent-cyan/10 rounded-full flex items-center justify-center text-accent-cyan mb-6 shadow-[0_0_30px_rgba(34,211,238,0.2)]">
+                    <Sparkles size={40} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-surface mb-2">{success.message}</h3>
+                  <p className="text-surface-muted mb-8 max-w-md">
+                    MR #{success.iid} has been created and reviewed.
+                  </p>
 
-      <Card className="p-8">
-        <CardContent>
-          <div className="space-y-6">
-            <Select
-              label="Source Branch"
-              value={src}
-              onChange={(e) => setSrc(e.target.value)}
-              options={branchOptions}
-              placeholder={loadingBranches ? "Loading branches..." : "Select source branch"}
-              disabled={loading || loadingBranches}
-              required
-              helperText="The branch containing your changes"
-            />
+                  <div className="flex flex-col sm:flex-row gap-4 mt-2">
+                    <Button
+                      href={success.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-[160px] shadow-lg shadow-primary/20"
+                    >
+                      View in GitLab
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setSuccess(null)}
+                      className="min-w-[140px]"
+                    >
+                      Create Another
+                    </Button>
+                  </div>
 
-            <Select
-              label="Target Branch"
-              value={tgt}
-              onChange={(e) => setTgt(e.target.value)}
-              options={branchOptions}
-              placeholder={loadingBranches ? "Loading branches..." : "Select target branch"}
-              disabled={loading || loadingBranches}
-              required
-              helperText="The branch to merge into"
-            />
+                  {success.comments && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className={`mt-10 p-4 rounded-xl border flex items-center gap-3 text-sm ${success.comments.posted === 0
+                          ? "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400"
+                          : "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
+                        }`}
+                    >
+                      {success.comments.posted === 0 ? (
+                        <div className="p-1 rounded-full bg-green-500/20"><Sparkles size={14} /></div>
+                      ) : (
+                        <div className="p-1 rounded-full bg-blue-500/20"><Sparkles size={14} /></div>
+                      )}
 
-            {src && tgt && src !== tgt && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="flex items-center gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl text-sm text-primary-light"
-              >
-                <GitBranch size={18} className="text-primary shrink-0" />
-                <div className="flex flex-wrap items-center gap-2 overflow-hidden">
-                  <span className="font-bold text-surface truncate max-w-[120px]">{src}</span>
-                  <span className="text-surface-muted">→</span>
-                  <span className="font-bold text-surface truncate max-w-[120px]">{tgt}</span>
-                </div>
-              </motion.div>
-            )}
+                      <div className="flex flex-col items-start text-left">
+                        <span className="font-semibold">AI Review Completed</span>
+                        <span className="opacity-90">
+                          {success.comments.posted === 0
+                            ? "No issues found. Code looks good!"
+                            : `${success.comments.posted} comments posted for review.`}
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="form"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-8"
+                >
+                  {error && (
+                    <Alert type="error">{error}</Alert>
+                  )}
 
-            <Select
-              label="AI Model"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              options={modelOptions}
-              disabled={loading}
-            />
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] gap-4 items-end">
+                    <Select
+                      label="Source"
+                      value={src}
+                      onChange={(e) => setSrc(e.target.value)}
+                      options={branchOptions}
+                      placeholder={loadingBranches ? "Loading..." : "Select source"}
+                      disabled={loadingBranches}
+                      className="w-full"
+                    />
 
-            <Button
-              className="w-full mt-2"
-              onClick={create}
-              disabled={loading || loadingBranches || !src || !tgt}
-              isLoading={loading}
-              loadingText="Creating..."
-              icon={Sparkles}
-              size="lg"
-            >
-              Create & Review MR
-            </Button>
+                    <div className="hidden md:flex items-center justify-center pb-3 text-surface-muted/30">
+                      <ArrowIcon size={24} />
+                    </div>
+
+                    <Select
+                      label="Target"
+                      value={tgt}
+                      onChange={(e) => setTgt(e.target.value)}
+                      options={branchOptions}
+                      placeholder={loadingBranches ? "Loading..." : "Select target"}
+                      disabled={loadingBranches}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Visual Connection Line */}
+                  {src && tgt && (
+                    <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 text-primary">
+                        <GitBranch size={16} />
+                        <span className="font-mono font-bold">{src}</span>
+                      </div>
+                      <div className="h-[1px] flex-1 bg-gradient-to-r from-primary/20 via-primary/50 to-primary/20 mx-4"></div>
+                      <div className="flex items-center gap-2 text-surface-muted">
+                        <GitBranch size={16} />
+                        <span className="font-mono font-bold">{tgt}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-border-color/5">
+                    <Select
+                      label="AI Model"
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      options={modelOptions}
+                      helperText="Choose the model for code analysis"
+                    />
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      className="w-full h-14 text-lg shadow-primary/25 shadow-xl"
+                      onClick={create}
+                      disabled={loadingBranches || !src || !tgt}
+                      icon={Sparkles}
+                    >
+                      Process Merge Request
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </CardContent>
       </Card>

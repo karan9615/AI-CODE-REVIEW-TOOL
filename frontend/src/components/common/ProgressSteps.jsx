@@ -5,14 +5,14 @@ import { Loader } from '../common/Loader';
 
 export function ProgressSteps({ steps }) {
   return (
-    <div className="glass-panel p-6 rounded-2xl mb-6">
+    <div className="space-y-2">
       {steps.map((step, index) => (
         <motion.div
           key={step.id}
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: index * 0.1 }}
-          className="flex items-center gap-3 py-3"
+          className="flex items-center gap-4 py-2"
         >
           <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 border ${step.status === "complete"
             ? "bg-accent-cyan/20 border-accent-cyan text-accent-cyan"
