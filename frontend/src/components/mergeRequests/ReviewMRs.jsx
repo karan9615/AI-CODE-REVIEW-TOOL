@@ -116,12 +116,12 @@ export function ReviewMRs({ token, project }) {
 
   return (
     <div className="w-full max-w-3xl mx-auto">
-      <Card className="overflow-hidden border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl min-h-[600px]">
+      <Card className="overflow-hidden border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl">
         {/* Decorative Grid Background */}
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light"></div>
 
         {/* Header Section */}
-        <div className="relative p-8 border-b border-border-color/10 bg-background-secondary/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="relative p-6 sm:p-8 border-b border-border-color/10 bg-background-secondary/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-accent-cyan/10 flex items-center justify-center text-accent-cyan shadow-inner">
               <FileCode size={24} />
@@ -143,89 +143,99 @@ export function ReviewMRs({ token, project }) {
           </Button>
         </div>
 
-        <CardContent className="p-0 relative z-10">
-          {error && (
-            <div className="p-8 pb-0">
-              <Alert type="error">{error}</Alert>
-            </div>
-          )}
-
-          {reviewSuccess && (
-            <div className="p-8 pb-0">
-              <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-                <Alert type="success">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-bold">Review Complete for MR #{reviewSuccess.iid}</span>
-                    <span className="text-sm opacity-90">
-                      {reviewSuccess.comments?.posted} comments posted successfully.
-                    </span>
-                  </div>
-                </Alert>
-              </motion.div>
-            </div>
-          )}
-
-          {/* Progress Steps Overlay */}
-          <AnimatePresence>
-            {reviewing && (
+        <CardContent className="p-0 relative z-10 transition-all duration-300 ease-in-out">
+          {/* Main Content / Loading Switcher */}
+          <AnimatePresence mode="wait">
+            {reviewing ? (
               <motion.div
+                key="reviewing"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex flex-col items-center justify-center py-16 px-8"
+              >
+                <div className="w-full max-w-sm mx-auto flex flex-col items-center">
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="mb-8 flex flex-col items-center gap-4"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg shadow-primary/20 relative overflow-hidden">
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/20 to-transparent"
+                        animate={{ x: ["-100%", "100%"] }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                      />
+                      <Sparkles size={32} />
+                    </div>
+                    <h3 className="text-xl font-bold text-surface">AI Review in Progress</h3>
+                  </motion.div>
+
+                  <ProgressSteps steps={progress} />
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="list"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 z-50 bg-background/80 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center"
               >
-                <div className="w-full max-w-md">
-                  <div className="mb-8 w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center text-primary relative">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                      className="absolute inset-0 border-2 border-primary/30 border-t-transparent rounded-full"
-                    />
-                    <Sparkles size={32} />
+                {error && (
+                  <div className="p-8 pb-0">
+                    <Alert type="error">{error}</Alert>
                   </div>
-                  <ProgressSteps steps={progress} />
+                )}
+
+                {reviewSuccess && (
+                  <div className="p-8 pb-0">
+                    <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+                      <Alert type="success">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-bold">Review Complete for MR #{reviewSuccess.iid}</span>
+                          <span className="text-sm opacity-90">
+                            {reviewSuccess.comments?.posted} comments posted successfully.
+                          </span>
+                        </div>
+                      </Alert>
+                    </motion.div>
+                  </div>
+                )}
+
+                <div className="p-6 sm:p-8 space-y-4 min-h-[400px]">
+                  {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 space-y-4 text-surface-muted">
+                      <Loader size="lg" text="" />
+                      <p>Fetching merge requests...</p>
+                    </div>
+                  ) : mrs.length === 0 ? (
+                    <div className="text-center py-20 px-4">
+                      <div className="w-16 h-16 mx-auto bg-surface-muted/10 rounded-full flex items-center justify-center text-surface-muted mb-4">
+                        <FileCode size={32} opacity={0.5} />
+                      </div>
+                      <h3 className="text-lg font-semibold text-surface mb-2">No Open Merge Requests</h3>
+                      <p className="text-sm text-surface-muted max-w-xs mx-auto">
+                        There are no open merge requests in this project. Create one to get started!
+                      </p>
+                    </div>
+                  ) : (
+                    <motion.div layout className="grid grid-cols-1 gap-4">
+                      {mrs.map((mr) => (
+                        <MRCard
+                          key={mr.iid}
+                          mr={mr}
+                          onReview={handleReviewClick}
+                          isReviewing={reviewing === mr.iid}
+                        />
+                      ))}
+                    </motion.div>
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-
-          <div className="p-6 sm:p-8 space-y-4">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 space-y-4 text-surface-muted">
-                <Loader size="lg" text="" />
-                <p>Fetching merge requests...</p>
-              </div>
-            ) : mrs.length === 0 ? (
-              <div className="text-center py-20 px-4">
-                <div className="w-16 h-16 mx-auto bg-surface-muted/10 rounded-full flex items-center justify-center text-surface-muted mb-4">
-                  <FileCode size={32} opacity={0.5} />
-                </div>
-                <h3 className="text-lg font-semibold text-surface mb-2">No Open Merge Requests</h3>
-                <p className="text-sm text-surface-muted max-w-xs mx-auto">
-                  There are no open merge requests in this project. Create one to get started!
-                </p>
-              </div>
-            ) : (
-              <motion.div layout className="grid grid-cols-1 gap-4">
-                {mrs.map((mr) => (
-                  <MRCard
-                    key={mr.iid}
-                    mr={mr}
-                    onReview={handleReviewClick}
-                    isReviewing={reviewing === mr.iid}
-                  />
-                ))}
-              </motion.div>
-            )}
-          </div>
         </CardContent>
 
-        {/* Modal remains unchanged logically but structurally inside the fragment if needed, 
-            though it renders via Portal usually or absolute. 
-            We'll stick to keeping the Modal code as is but just outside this main return block 
-            or ensure it's still in the component tree.
-            Wait, I am replacing the return block of ReviewMRs. 
-            I need to keep the Modal rendering. */}
       </Card>
 
       {/* Model Selection Modal */}

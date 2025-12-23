@@ -124,11 +124,24 @@ export function CreateMR({ token, project }) {
                   exit={{ opacity: 0, scale: 1.05 }}
                   className="flex flex-col items-center justify-center py-8"
                 >
-                  <div className="w-full max-w-md">
+                  <div className="w-full max-w-sm mx-auto flex flex-col items-center">
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="mb-8 flex flex-col items-center gap-4"
+                    >
+                      <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg shadow-primary/20 relative overflow-hidden">
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/20 to-transparent"
+                          animate={{ x: ["-100%", "100%"] }}
+                          transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                        />
+                        <Sparkles size={32} />
+                      </div>
+                      <h3 className="text-xl font-bold text-surface">Processing Request</h3>
+                    </motion.div>
+
                     <ProgressSteps steps={progress} />
-                    <div className="text-center mt-6 text-surface-muted animate-pulse">
-                      Please wait while AI analyzes your code...
-                    </div>
                   </div>
                 </motion.div>
               ) : success ? (
@@ -170,8 +183,8 @@ export function CreateMR({ token, project }) {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
                       className={`mt-10 p-4 rounded-xl border flex items-center gap-3 text-sm ${success.comments.posted === 0
-                          ? "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400"
-                          : "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
+                        ? "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400"
+                        : "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
                         }`}
                     >
                       {success.comments.posted === 0 ? (
