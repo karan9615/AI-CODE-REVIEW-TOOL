@@ -16,48 +16,39 @@ const rules = JSON.parse(
  */
 export async function generateMRContent(model, diffs) {
   const prompt = `
-You are a Senior Software Engineer performing a GitLab Merge Request review.
+  You are a Senior Software Engineer reviewing a GitLab Merge Request.
 
-Your task is to generate a HIGH-QUALITY Merge Request title and description
-based ONLY on the provided code diffs.
+  Your job is to generate a PRODUCTION-READY, ACCURATE Merge Request title and description based ONLY on the provided code diffs. Do NOT invent or assume context that is not present in the diffs.
 
-### Objectives
-- Be precise and factual
-- Do NOT invent context not visible in diffs
-- Prefer clarity over verbosity
-- Follow GitLab merge request best practices
+  ## Title (max 72 chars)
+  - Start with a strong verb (Fix, Add, Improve, Refactor, Remove)
+  - Summarize the main change only, no punctuation at the end
 
-### Title Rules
-- Max 72 characters
-- Start with a verb (Fix, Add, Improve, Refactor, Remove)
-- Describe the primary change only
-- No punctuation at the end
+  ## Description (Markdown)
+  1. **Summary**
+    - 2–3 bullet points: WHAT changed and WHY (based only on diffs)
+  2. **Key Changes**
+    - Bullet list, each item must map to a real diff
+    - Do NOT repeat code, do NOT add generic or info points
+  3. **Risks / Considerations**
+    - Only mention risks that are clearly visible in the diff
+    - If no real risks, say: "No significant risks identified"
+  4. **Testing Notes**
+    - What should be manually verified (if testable)
+    - If not testable, say so
 
-### Description Structure (Markdown)
-1. **Summary**
-   - 2–3 bullet points describing WHAT changed and WHY
+  ## STRICT RULES
+  - Do NOT add any invented, generic, or info comments
+  - Do NOT add anything not directly supported by the diffs
+  - Output must be concise, clear, and factual
+  - The output will be strictly validated against a JSON schema
 
-2. **Key Changes**
-   - Bullet list mapped to actual diffs
-   - Avoid repeating code verbatim
+  ## Review Rules
+  ${JSON.stringify(rules)}
 
-3. **Risks / Considerations**
-   - Mention only REAL risks visible in the diff
-   - If none, explicitly say: "No significant risks identified"
-
-4. **Testing Notes**
-   - What should be manually verified
-   - If not testable here, say so explicitly
-
-### Review Rules (apply strictly)
-${JSON.stringify(rules)}
-
-### Code Diffs
-${JSON.stringify(diffs)}
-
-### Output Format
-The output will be strictly validated against a JSON schema.
-`;
+  ## Code Diffs
+  ${JSON.stringify(diffs)}
+  `;
 
   try {
     // AIService now returns the parsed object directly
@@ -144,44 +135,33 @@ export async function generateInlineReviews(model, diffs) {
   const enrichedDiffs = buildEnrichedDiffs(diffs);
 
   const prompt = `
-You are a **Senior Software Engineer** performing an **in-depth Code Review**.
+You are a **Senior Software Engineer** doing a code review for a GitLab Merge Request.
 
-### YOUR MISSION
-Perform a **thorough, critical analysis** of the code changes below. Look beyond surface-level issues.
+## YOUR TASK
+Review the code changes below and ONLY generate actionable, specific comments that require the developer to update or improve the code. Do NOT add info comments, explanations, or compliments. Only comment if a real, actionable change is needed.
 
-### CONTEXT PROVIDED
-For each file, you have:
-- **Changed lines** (added/deleted) with exact line numbers
-- **Context lines** (unchanged code surrounding the changes) to understand the broader logic
-- **File metadata** (new/deleted/renamed status)
+## CONTEXT
+- You have changed lines (added/deleted) with line numbers
+- You have context lines and file metadata
 
-### WHAT TO ANALYZE (in order of priority)
+## WHAT TO COMMENT ON (in order of priority)
+1. **Critical**: Security, data loss, breaking changes, memory leaks, performance killers
+2. **High**: Logic errors, error handling, type safety, concurrency bugs
+3. **Important**: Code smells, maintainability, best practices
 
-#### 🔴 CRITICAL (Must comment if found)
-- **Security vulnerabilities**: SQL injection, XSS, hardcoded secrets, insecure authentication
-- **Data integrity risks**: Potential data loss, race conditions, incorrect state management
-- **Breaking changes**: API changes, removed functionality, incompatible updates
-- **Memory leaks**: Unclosed resources, event listener leaks, circular references
-- **Performance killers**: N+1 queries, unnecessary loops, blocking operations
+## STRICT RULES
+- Do NOT add info comments, explanations, or praise
+- Do NOT add comments unless the code should be updated or improved
+- Each comment must be actionable and map to a real changed line
+- Output must be a JSON array matching the schema
 
-#### 🟡 HIGH PRIORITY
-- **Logic errors**: Incorrect conditions, off-by-one errors, missing edge cases
-- **Error handling gaps**: Unhandled promises, missing try-catch, silent failures
-- **Type safety issues**: Missing null checks, incorrect type assumptions
-- **Concurrency bugs**: Race conditions, missing async/await, promise chain errors
-
-#### 🟢 IMPORTANT
-- **Code smells**: Duplicated logic, overly complex functions, poor naming
-- **Maintainability**: Unclear logic, missing documentation for complex code
-- **Best practices**: Violation of SOLID principles, improper separation of concerns
-
-### ENRICHED DIFF DATA
+## ENRICHED DIFF DATA
 ${JSON.stringify(enrichedDiffs, null, 2)}
 
-### REVIEW RULES
+## REVIEW RULES
 ${JSON.stringify(rules, null, 2)}
 
-### OUTPUT FORMAT
+## OUTPUT FORMAT
 The output will be strictly validated against a JSON schema.
 `;
 
