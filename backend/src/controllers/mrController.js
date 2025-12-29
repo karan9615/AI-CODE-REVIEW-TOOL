@@ -15,7 +15,9 @@ export const createMR = async (req, res) => {
     }
     if (!model || !isValidModel(model)) {
       return res.status(400).json({
-        error: `Valid model is required. Available: ${getValidModelKeys().join(", ")}`,
+        error: `Valid model is required. Available: ${getValidModelKeys().join(
+          ", "
+        )}`,
       });
     }
     if (!mr || !mr.source_branch || !mr.target_branch) {
@@ -37,8 +39,8 @@ export const createMR = async (req, res) => {
     const diffs = await gl.compareBranches(
       token,
       projectId,
-      source_branch,
-      target_branch
+      target_branch, // FROM: the base branch
+      source_branch // TO: the branch with new changes
     );
 
     if (!diffs || diffs.length === 0) {
@@ -176,7 +178,9 @@ export const reviewMR = async (req, res) => {
     }
     if (!model || !isValidModel(model)) {
       return res.status(400).json({
-        error: `Valid model is required. Available: ${getValidModelKeys().join(", ")}`,
+        error: `Valid model is required. Available: ${getValidModelKeys().join(
+          ", "
+        )}`,
       });
     }
 
