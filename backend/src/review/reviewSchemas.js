@@ -15,10 +15,11 @@ export const inlineReviewSchema = {
     properties: {
       filePath: { type: "string" },
       line: { type: "integer" },
+      oldLine: { type: "integer" },
       severity: { type: "string" },
       comment: { type: "string" },
     },
-    required: ["filePath", "line", "severity", "comment"],
+    required: ["filePath", "severity", "comment"],
     additionalProperties: false,
   },
 };
