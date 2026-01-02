@@ -8,7 +8,7 @@ import {
 
 const router = express.Router();
 
-router.post("/projects", validateToken, getProjects);
+router.get("/projects", validateToken, getProjects);
 router.post("/branches", validateToken, getBranches);
 router.post("/mrs", validateToken, getMergeRequests);
 

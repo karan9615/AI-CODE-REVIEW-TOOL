@@ -12,107 +12,74 @@ import { Select } from "../ui/Select";
 import { Card, CardContent } from "../ui/Card";
 import { useModels } from "../../contexts/ModelsContext";
 
-export function ReviewMRs({ token, project }) {
+import { useMergeRequest } from "../../hooks/useMergeRequest";
+
+export function ReviewMRs({ project }) {
   const [mrs, setMrs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [reviewing, setReviewing] = useState(null);
-  const [reviewSuccess, setReviewSuccess] = useState(null);
-  const [progress, setProgress] = useState([]);
+  const [loadingMrs, setLoadingMrs] = useState(true);
+  const [listError, setListError] = useState(null);
+  const [reviewingIid, setReviewingIid] = useState(null);
 
   const [showModelModal, setShowModelModal] = useState(false);
   const [selectedMR, setSelectedMR] = useState(null);
   const [selectedModel, setSelectedModel] = useState("chatgpt");
 
-  // Get models from context (fetched once per session)
+  // Custom Hook
+  const { loading: reviewLoading, error: reviewError, success: reviewSuccess, progress, reviewMR, resetState } = useMergeRequest(project.id);
+
+  // Get models from context
   const { models: modelOptions } = useModels();
+  
+  // Combine errors
+  const error = listError || reviewError;
 
   useEffect(() => {
     loadMRs();
   }, []);
 
   const loadMRs = async () => {
-    setLoading(true);
-    setError(null);
+    setLoadingMrs(true);
+    setListError(null);
     try {
-      const data = await api("/mrs", { token, projectId: project.id });
+      const data = await api("/mrs", { projectId: project.id });
       if (data.error) throw new Error(data.error);
       setMrs(data);
     } catch (err) {
-      setError("Failed to load merge requests: " + err.message);
+      setListError("Failed to load merge requests: " + err.message);
     } finally {
-      setLoading(false);
+      setLoadingMrs(false);
     }
   };
 
   const handleReviewClick = (mr) => {
     setSelectedMR(mr);
     setShowModelModal(true);
-    setReviewSuccess(null);
-    setError(null);
+    resetState();
   };
 
   const startReview = async () => {
     if (!selectedMR) return;
 
     setShowModelModal(false);
-    setReviewing(selectedMR.iid);
-    setReviewSuccess(null);
-    setError(null);
-
-    // Show progress steps
-    setProgress([
-      { id: 1, text: "Fetching MR details...", status: "active" },
-      { id: 2, text: "Analyzing code changes...", status: "pending" },
-      { id: 3, text: "Generating AI review...", status: "pending" },
-      { id: 4, text: "Posting comments...", status: "pending" },
-    ]);
+    setReviewingIid(selectedMR.iid);
+    resetState();
 
     try {
-      // Step 1: Fetching details
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setProgress((p) => p.map((s, i) => (i === 0 ? { ...s, status: "complete" } : i === 1 ? { ...s, status: "active" } : s)));
-
-      // Step 2: Analyzing changes
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setProgress((p) => p.map((s, i) => (i <= 1 ? { ...s, status: "complete" } : i === 2 ? { ...s, status: "active" } : s)));
-
-      // Step 3: Call API
-      const result = await api("/review-mr", {
-        token,
-        projectId: project.id,
-        mrIid: selectedMR.iid,
-        model: selectedModel,
-      });
-
-      if (result.error) throw new Error(result.error);
-
-      setProgress((p) => p.map((s, i) => (i <= 2 ? { ...s, status: "complete" } : i === 3 ? { ...s, status: "active" } : s)));
-
-      // Step 4: Complete
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setProgress((p) => p.map((s) => ({ ...s, status: "complete" })));
-
-      setReviewSuccess({
-        iid: selectedMR.iid,
-        comments: result.comments,
-      });
+      await reviewMR(selectedMR.iid, selectedModel);
     } catch (err) {
-      setError(`Failed to review MR #${selectedMR.iid}: ${err.message}`);
-      setProgress([]);
+      // Handled by hook
     } finally {
-      setReviewing(null);
+      setReviewingIid(null);
     }
   };
 
-  if (loading) {
+  if (loadingMrs) {
     return (
       <div className="flex justify-center items-center py-20">
         <Loader size="lg" text="Loading Merge Requests..." />
       </div>
     );
   }
-
 
   return (
     <div className="w-full max-w-3xl mx-auto">
@@ -133,7 +100,7 @@ export function ReviewMRs({ token, project }) {
           </div>
           <Button
             onClick={loadMRs}
-            disabled={loading}
+            disabled={loadingMrs}
             variant="secondary"
             size="sm"
             className="shrink-0 rounded-full px-4 font-medium text-sm gap-2 hover:bg-surface-muted/20"
@@ -146,7 +113,7 @@ export function ReviewMRs({ token, project }) {
         <CardContent className="p-0 relative z-10 transition-all duration-300 ease-in-out">
           {/* Main Content / Loading Switcher */}
           <AnimatePresence mode="wait">
-            {reviewing ? (
+            {reviewingIid ? (
               <motion.div
                 key="reviewing"
                 initial={{ opacity: 0, height: 0 }}
@@ -203,7 +170,7 @@ export function ReviewMRs({ token, project }) {
                 )}
 
                 <div className="p-6 sm:p-8 space-y-4 min-h-[400px]">
-                  {loading ? (
+                  {loadingMrs ? (
                     <div className="flex flex-col items-center justify-center py-20 space-y-4 text-surface-muted">
                       <Loader size="lg" text="" />
                       <p>Fetching merge requests...</p>
@@ -225,7 +192,7 @@ export function ReviewMRs({ token, project }) {
                           key={mr.iid}
                           mr={mr}
                           onReview={handleReviewClick}
-                          isReviewing={reviewing === mr.iid}
+                          isReviewing={reviewingIid === mr.iid}
                         />
                       ))}
                     </motion.div>

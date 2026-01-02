@@ -1,11 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Sparkles, GitBranch } from 'lucide-react';
 import { Alert } from '../common/Alert';
 import { Loader } from '../common/Loader';
 import { motion } from 'framer-motion';
 import { ThemeToggle } from '../common/ThemeToggle';
 
-export function LoginView({ user, setUser, token, setToken, loading, error, load, handleKeyPress }) {
+export function LoginView({ loading, error, onLogin }) {
+  const [user, setUser] = useState("");
+  const [token, setToken] = useState("");
+
+  const handleSubmit = () => {
+    if (token) onLogin(user, token);
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !loading) handleSubmit();
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background transition-colors duration-300">
 
@@ -82,7 +93,7 @@ export function LoginView({ user, setUser, token, setToken, loading, error, load
             whileTap={{ scale: 0.98 }}
             className={`w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl text-white font-semibold transition-all shadow-lg shadow-primary/20 border border-primary/50 relative overflow-hidden group ${loading ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover'
               }`}
-            onClick={load}
+            onClick={handleSubmit}
             disabled={loading}
           >
             {/* Button Shine Effect */}

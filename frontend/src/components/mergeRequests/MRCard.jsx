@@ -19,7 +19,7 @@ export function MRCard({ mr, onReview, isReviewing }) {
             </div>
           </div>
 
-          <h4 className="text-base font-bold text-surface leading-tight hover:text-primary transition-colors cursor-pointer line-clamp-1" onClick={() => window.open(mr.web_url, '_blank')}>
+          <h4 className="text-base font-bold text-surface leading-tight hover:text-primary transition-colors cursor-pointer line-clamp-1" onClick={() => window.open(mr.web_url, '_blank', 'noopener,noreferrer')}>
             {mr.title}
           </h4>
 
@@ -43,6 +43,7 @@ export function MRCard({ mr, onReview, isReviewing }) {
             className="!p-2 text-surface-muted hover:text-surface"
             href={mr.web_url}
             target="_blank"
+            rel="noopener noreferrer"
           >
             <ExternalLink size={18} />
           </Button>

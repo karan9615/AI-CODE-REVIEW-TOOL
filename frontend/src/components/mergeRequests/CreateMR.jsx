@@ -9,18 +9,22 @@ import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
 import { useModels } from "../../contexts/ModelsContext";
 
-export function CreateMR({ token, project }) {
+import { useMergeRequest } from "../../hooks/useMergeRequest";
+
+export function CreateMR({ project }) {
   const [branches, setBranches] = useState([]);
   const [src, setSrc] = useState("");
   const [tgt, setTgt] = useState("");
   const [model, setModel] = useState("chatgpt");
-  const [loading, setLoading] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(true);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [progress, setProgress] = useState([]);
+  const [branchError, setBranchError] = useState(null);
 
-  // Get models from context
+  // Use Custom Hook
+  const { loading, error: mrError, success, progress, createMR, resetState } = useMergeRequest(project.id);
+  
+  // Combine errors for display
+  const error = mrError || branchError;
+
   const { models: modelOptions } = useModels();
 
   useEffect(() => {
@@ -29,65 +33,31 @@ export function CreateMR({ token, project }) {
 
   const loadBranches = async () => {
     setLoadingBranches(true);
+    setBranchError(null);
     try {
-      const data = await api("/branches", { token, projectId: project.id });
+      const data = await api("/branches", { projectId: project.id });
       if (data.error) throw new Error(data.error);
       setBranches(data);
     } catch (err) {
-      setError("Failed to load branches: " + err.message);
+      setBranchError("Failed to load branches: " + err.message);
     } finally {
       setLoadingBranches(false);
     }
   };
 
   const create = async () => {
-    if (!src || !tgt) return setError("Please select both source and target branches");
-    if (src === tgt) return setError("Source and target branches must be different");
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    setProgress([
-      { id: 1, text: "Analyzing changes...", status: "active" },
-      { id: 2, text: "Generating MR content...", status: "pending" },
-      { id: 3, text: "Creating merge request...", status: "pending" },
-      { id: 4, text: "Posting AI review comments...", status: "pending" },
-    ]);
-
+    if (!src || !tgt) return setBranchError("Please select both source and target branches");
+    if (src === tgt) return setBranchError("Source and target branches must be different");
+    
+    setBranchError(null);
+    
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setProgress((p) => p.map((s, i) => (i === 0 ? { ...s, status: "complete" } : i === 1 ? { ...s, status: "active" } : s)));
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setProgress((p) => p.map((s, i) => (i <= 1 ? { ...s, status: "complete" } : i === 2 ? { ...s, status: "active" } : s)));
-
-      const result = await api("/mr", {
-        token,
-        projectId: project.id,
-        model,
-        mr: { source_branch: src, target_branch: tgt },
-      });
-
-      if (result.error) throw new Error(result.error);
-
-      setProgress((p) => p.map((s, i) => (i <= 2 ? { ...s, status: "complete" } : i === 3 ? { ...s, status: "active" } : s)));
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setProgress((p) => p.map((s) => ({ ...s, status: "complete" })));
-
-      setSuccess({
-        message: "Merge Request Created",
-        iid: result.iid,
-        url: result.web_url,
-        comments: result.comments,
-      });
-      // Reset form slightly but keep success state visible
+      await createMR({ sourceBranch: src, targetBranch: tgt, model });
+      // Reset form on success
       setSrc("");
       setTgt("");
-    } catch (err) {
-      setError(err.message || "Failed to create merge request");
-      setProgress([]);
-    } finally {
-      setLoading(false);
+    } catch(e) {
+      // Error handled by hook
     }
   };
 
@@ -170,7 +140,7 @@ export function CreateMR({ token, project }) {
                     </Button>
                     <Button
                       variant="secondary"
-                      onClick={() => setSuccess(null)}
+                      onClick={resetState}
                       className="min-w-[140px]"
                     >
                       Create Another

@@ -5,7 +5,7 @@ import { CreateMR } from "../mergeRequests/CreateMR";
 import { ReviewMRs } from "../mergeRequests/ReviewMRs";
 import { motion, AnimatePresence } from "framer-motion";
 
-export function MainApp({ token, project, view, setView, onBack, logout }) {
+export function MainApp({ project, view, setView, onBack, logout }) {
   const tabs = [
     { id: "create", label: "Create Request", icon: GitMerge },
     { id: "review", label: "Review Requests", icon: GitPullRequest },
@@ -122,11 +122,11 @@ export function MainApp({ token, project, view, setView, onBack, logout }) {
           >
             {view === "create" ? (
               <div className="max-w-3xl mx-auto">
-                <CreateMR token={token} project={project} />
+                <CreateMR project={project} />
               </div>
             ) : (
               <div className="max-w-4xl mx-auto">
-                <ReviewMRs token={token} project={project} />
+                <ReviewMRs project={project} />
               </div>
             )}
           </motion.div>

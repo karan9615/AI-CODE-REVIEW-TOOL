@@ -2,7 +2,7 @@ import * as gl from "../gitlab/gitlabService.js";
 
 export const getProjects = async (req, res) => {
   try {
-    const projects = await gl.getProjects(req.body.token);
+    const projects = await gl.getProjects(req.token);
     res.json(projects);
   } catch (error) {
     console.error("Failed to fetch projects:", error.message);
@@ -15,7 +15,8 @@ export const getProjects = async (req, res) => {
 
 export const getBranches = async (req, res) => {
   try {
-    const { token, projectId } = req.body;
+    const { projectId } = req.body;
+    const token = req.token;
 
     if (!projectId) {
       return res.status(400).json({ error: "projectId is required" });
@@ -34,7 +35,8 @@ export const getBranches = async (req, res) => {
 
 export const getMergeRequests = async (req, res) => {
   try {
-    const { token, projectId } = req.body;
+    const { projectId } = req.body;
+    const token = req.token;
 
     if (!projectId) {
       return res.status(400).json({ error: "projectId is required" });
