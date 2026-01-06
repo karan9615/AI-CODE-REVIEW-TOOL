@@ -68,19 +68,41 @@ app.use(express.json({ limit: "10kb" }));
 app.use(cookieParser());
 
 // Cookie Session (HTTP-Only)
+// For cross-domain cookies (Netlify -> Render), we need secure + sameSite=none
+const isProduction = envConfig.nodeEnv === "production";
+const isCrossDomain = envConfig.clientUrl && !envConfig.clientUrl.includes("localhost");
+
 app.use(
   cookieSession({
     name: "session",
     keys: [envConfig.sessionSecret],
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    secure: envConfig.nodeEnv === "production", // Only secure in production (HTTPS)
+    secure: isProduction || isCrossDomain, // Secure for production OR cross-domain (Render uses HTTPS)
     httpOnly: true, // Prevents JS access
-    sameSite: envConfig.nodeEnv === "production" ? "none" : "lax", // Needed for cross-site cookie if FE/BE are different domains
+    sameSite: isCrossDomain ? "none" : "lax", // 'none' required for cross-site cookies (Netlify <-> Render)
   })
 );
 
 // Prevent Parameter Pollution
 app.use(hpp());
+
+// Health check endpoint with config info (for debugging)
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    config: {
+      nodeEnv: envConfig.nodeEnv,
+      clientUrl: envConfig.clientUrl,
+      cookieSettings: {
+        secure: isProduction || isCrossDomain,
+        sameSite: isCrossDomain ? "none" : "lax",
+        isCrossDomain,
+        isProduction,
+      },
+    },
+  });
+});
 
 // Routes
 app.use("/api", routes);

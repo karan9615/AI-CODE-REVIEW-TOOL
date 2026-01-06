@@ -1,6 +1,6 @@
 /**
  * AI Provider Configuration
- * 
+ *
  * This file defines all available AI providers and their models.
  * To add a new provider or model:
  * 1. Add the provider configuration here
@@ -13,39 +13,39 @@ export const AI_PROVIDERS = {
     name: "OpenAI",
     enabled: true,
     models: [
-      {
-        key: "gpt-4",
-        label: "GPT-4 (gpt-4) - Most Capable",
-        provider: "openai",
-        config: {
-          model: "gpt-4",
-          temperature: 0.2,
-          maxTokens: 4000,
-        },
-        recommended: false,
-      },
-      {
-        key: "gpt-4-turbo",
-        label: "GPT-4 Turbo (gpt-4-turbo-preview) - Faster & Cheaper",
-        provider: "openai",
-        config: {
-          model: "gpt-4-turbo-preview",
-          temperature: 0.2,
-          maxTokens: 4000,
-        },
-        recommended: false,
-      },
-      {
-        key: "gpt-3.5-turbo",
-        label: "GPT-3.5 Turbo (gpt-3.5-turbo) - Fast & Economical",
-        provider: "openai",
-        config: {
-          model: "gpt-3.5-turbo",
-          temperature: 0.2,
-          maxTokens: 4000,
-        },
-        recommended: false,
-      },
+      // {
+      //   key: "gpt-4",
+      //   label: "GPT-4 (gpt-4) - Most Capable",
+      //   provider: "openai",
+      //   config: {
+      //     model: "gpt-4",
+      //     temperature: 0.2,
+      //     maxTokens: 4000,
+      //   },
+      //   recommended: false,
+      // },
+      // {
+      //   key: "gpt-4-turbo",
+      //   label: "GPT-4 Turbo (gpt-4-turbo-preview) - Faster & Cheaper",
+      //   provider: "openai",
+      //   config: {
+      //     model: "gpt-4-turbo-preview",
+      //     temperature: 0.2,
+      //     maxTokens: 4000,
+      //   },
+      //   recommended: false,
+      // },
+      // {
+      //   key: "gpt-3.5-turbo",
+      //   label: "GPT-3.5 Turbo (gpt-3.5-turbo) - Fast & Economical",
+      //   provider: "openai",
+      //   config: {
+      //     model: "gpt-3.5-turbo",
+      //     temperature: 0.2,
+      //     maxTokens: 4000,
+      //   },
+      //   recommended: false,
+      // },
     ],
   },
   google: {
@@ -100,7 +100,7 @@ export const AI_PROVIDERS = {
  */
 export function getAvailableModels() {
   const models = [];
-  
+
   for (const [providerId, provider] of Object.entries(AI_PROVIDERS)) {
     if (provider.enabled) {
       for (const model of provider.models) {
@@ -114,7 +114,7 @@ export function getAvailableModels() {
       }
     }
   }
-  
+
   return models;
 }
 
@@ -125,7 +125,7 @@ export function getAvailableModels() {
  */
 export function getModelConfig(modelKey) {
   const models = getAvailableModels();
-  return models.find(m => m.key === modelKey) || null;
+  return models.find((m) => m.key === modelKey) || null;
 }
 
 /**
@@ -142,11 +142,11 @@ export function isValidModel(modelKey) {
  * @returns {Array<string>} Array of valid model keys
  */
 export function getValidModelKeys() {
-  return getAvailableModels().map(m => m.key);
+  return getAvailableModels().map((m) => m.key);
 }
 
 // Backward compatibility: Export models in the old format for API
-export const AI_MODELS = getAvailableModels().map(m => ({
+export const AI_MODELS = getAvailableModels().map((m) => ({
   key: m.key,
   label: m.recommended ? `${m.label} - Recommended` : m.label,
 }));
