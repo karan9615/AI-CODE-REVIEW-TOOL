@@ -242,6 +242,143 @@ gitlab-mr-ai-review-complete/
 └── .env.example                     # Environment variables template
 ```
 
+## 🚀 Production Deployment
+
+### Deploying to Render (Backend) + Netlify (Frontend)
+
+This guide helps you deploy the backend to [Render](https://render.com) and the frontend to [Netlify](https://netlify.com).
+
+#### Backend Deployment (Render)
+
+1. **Create a new Web Service on Render**
+   - Connect your GitHub repository
+   - Choose the `backend` directory as the root directory
+   - Build command: `npm install`
+   - Start command: `npm start`
+
+2. **Configure Environment Variables on Render**
+   
+   Go to your service's Environment tab and add:
+
+   ```
+   NODE_ENV=production
+   CLIENT_URL=https://your-frontend-app.netlify.app
+   SESSION_SECRET=<generate-a-strong-random-secret>
+   OPENAI_API_KEY=<your-openai-key>
+   GEMINI_API_KEY=<your-gemini-key>
+   ```
+
+   **Important Notes:**
+   - `CLIENT_URL` must exactly match your Netlify frontend URL (no trailing slash)
+   - Generate `SESSION_SECRET` with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+   - Render automatically provides HTTPS (required for secure cookies)
+
+3. **Verify Deployment**
+   
+   After deployment, check the health endpoint:
+   ```bash
+   curl https://your-backend.onrender.com/api/health
+   ```
+   
+   This should return configuration details including:
+   - CLIENT_URL being used
+   - Cookie settings (secure: true, sameSite: "none")
+   - Environment mode
+
+#### Frontend Deployment (Netlify)
+
+1. **Create a new Site on Netlify**
+   - Connect your GitHub repository
+   - Base directory: `frontend`
+   - Build command: `npm run build`
+   - Publish directory: `frontend/dist`
+
+2. **Configure Environment Variables on Netlify**
+   
+   Go to Site settings → Environment variables and add:
+
+   ```
+   VITE_API_URL=https://your-backend.onrender.com/api
+   ```
+
+3. **Update CORS Settings**
+   
+   After getting your Netlify URL, go back to Render and update:
+   ```
+   CLIENT_URL=https://your-actual-app.netlify.app
+   ```
+
+#### Testing Cross-Origin Authentication
+
+After deployment, verify that authentication works:
+
+1. **Test Login Flow**
+   - Open your Netlify frontend URL
+   - Login with GitLab token
+   - Check browser DevTools → Application → Cookies
+   - Verify session cookie has: `Secure: true`, `SameSite: None`, `HttpOnly: true`
+
+2. **Test API Requests**
+   - After login, try loading projects
+   - Check browser DevTools → Network tab
+   - Verify requests to your Render backend include the session cookie
+   - Check Response headers for proper CORS headers
+
+3. **Debug Issues**
+   - If authentication fails, check backend logs on Render
+   - Look for authentication attempt logs (✅ or ❌ markers)
+   - Verify CLIENT_URL matches exactly (check /api/health)
+   - Ensure both sites use HTTPS
+
+#### Common Deployment Issues
+
+**"Unauthorized: Valid GitLab Token required"**
+- Check CLIENT_URL is set correctly on Render
+- Verify session cookie is set with SameSite=None and Secure=true
+- Check browser console for CORS errors
+
+**"CORS policy error"**
+- Ensure CLIENT_URL exactly matches your Netlify URL
+- Remove any trailing slashes from CLIENT_URL
+- Verify VITE_API_URL on Netlify points to Render backend
+
+**Session cookie not being set**
+- Both frontend and backend must use HTTPS in production
+- Check browser blocks third-party cookies (test in incognito mode)
+- Verify cookie settings in /api/health endpoint response
+
+## 📁 Project Structure (Development)
+
+```
+gitlab-mr-ai-review-complete/
+├── backend/
+│   ├── src/
+│   │   ├── ai/
+│   │   │   ├── aiRouter.js          # AI model routing
+│   │   │   ├── chatgptAdapter.js    # OpenAI integration
+│   │   │   └── geminiAdapter.js     # Google Gemini integration
+│   │   ├── gitlab/
+│   │   │   ├── gitlabClient.js      # Axios client setup
+│   │   │   └── gitlabService.js     # GitLab API methods
+│   │   ├── review/
+│   │   │   └── reviewService.js     # AI review logic
+│   │   ├── app.js                   # Express app setup
+│   │   ├── routes.js                # API endpoints
+│   │   └── server.js                # Server entry point
+│   ├── config/
+│   │   └── review.rules.json        # Code review rules
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx                  # Main React component
+│   │   ├── App.css                  # GitLab-inspired styles
+│   │   ├── api.js                   # API client
+│   │   └── main.jsx                 # React entry point
+│   ├── index.html
+│   └── package.json
+└── .env.example                     # Environment variables template
+```
+
 ## 🐛 Troubleshooting
 
 **"Failed to load projects"**

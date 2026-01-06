@@ -55,13 +55,18 @@ const limiter = rateLimit({
 app.use("/api", limiter);
 
 // CORS
-app.use(
-  cors({
-    origin: envConfig.clientUrl,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: envConfig.clientUrl,
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true,
+};
+
+console.log("=== CORS Configuration ===");
+console.log(`Allowed Origin: ${corsOptions.origin}`);
+console.log(`Credentials: ${corsOptions.credentials}`);
+console.log("==========================");
+
+app.use(cors(corsOptions));
 
 // Body Parser with limits
 app.use(express.json({ limit: "10kb" }));
@@ -72,16 +77,26 @@ app.use(cookieParser());
 const isProduction = envConfig.nodeEnv === "production";
 const isCrossDomain = envConfig.clientUrl && !envConfig.clientUrl.includes("localhost");
 
-app.use(
-  cookieSession({
-    name: "session",
-    keys: [envConfig.sessionSecret],
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    secure: isProduction || isCrossDomain, // Secure for production OR cross-domain (Render uses HTTPS)
-    httpOnly: true, // Prevents JS access
-    sameSite: isCrossDomain ? "none" : "lax", // 'none' required for cross-site cookies (Netlify <-> Render)
-  })
-);
+const cookieSessionConfig = {
+  name: "session",
+  keys: [envConfig.sessionSecret],
+  maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  secure: isProduction || isCrossDomain, // Secure for production OR cross-domain (Render uses HTTPS)
+  httpOnly: true, // Prevents JS access
+  sameSite: isCrossDomain ? "none" : "lax", // 'none' required for cross-site cookies (Netlify <-> Render)
+};
+
+console.log("=== Cookie Session Configuration ===");
+console.log(`Environment: ${envConfig.nodeEnv}`);
+console.log(`Is Production: ${isProduction}`);
+console.log(`Is Cross-Domain: ${isCrossDomain}`);
+console.log(`Cookie Secure: ${cookieSessionConfig.secure}`);
+console.log(`Cookie SameSite: ${cookieSessionConfig.sameSite}`);
+console.log(`Cookie HttpOnly: ${cookieSessionConfig.httpOnly}`);
+console.log(`Cookie MaxAge: ${cookieSessionConfig.maxAge / 1000 / 60 / 60} hours`);
+console.log("====================================");
+
+app.use(cookieSession(cookieSessionConfig));
 
 // Prevent Parameter Pollution
 app.use(hpp());
