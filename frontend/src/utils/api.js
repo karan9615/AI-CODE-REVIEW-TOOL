@@ -11,27 +11,55 @@ const apiClient = axios.create({
   },
 });
 
+// Request interceptor for debugging
+apiClient.interceptors.request.use(
+  (config) => {
+    console.log(`🚀 ${config.method.toUpperCase()} ${config.url}`, {
+      data: config.data,
+      params: config.params,
+    });
+    return config;
+  },
+  (error) => {
+    console.error("Request error:", error);
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for debugging and global error handling
+apiClient.interceptors.response.use(
+  (response) => {
+    console.log(
+      `✅ ${response.config.method.toUpperCase()} ${response.config.url}`,
+      {
+        status: response.status,
+        data: response.data,
+      }
+    );
+    return response;
+  },
+  (error) => {
+    if (error.response) {
+      console.error(`❌ ${error.response.status} ${error.config.url}`, {
+        error: error.response.data,
+      });
+    }
+    return Promise.reject(error);
+  }
+);
+
 /**
  * Standardized API wrapper
- * Automatically handles token extraction and error parsing
+ * Automatically handles error parsing
+ * Uses cookie-based authentication (withCredentials: true)
  */
 export const api = async (path, body = {}, method = "POST") => {
   try {
-    // Security: Move token to Authorization header if explicitly passed (e.g. login)
-    const headers = {};
-    let data = body;
-
-    if (data && data.token) {
-      // Use token passed in body (mostly for Login or manual overrides)
-      headers["Authorization"] = `Bearer ${data.token}`;
-    }
-
     const response = await apiClient({
       method: method.toLowerCase(),
       url: path,
-      data: method !== "GET" ? data : undefined,
-      params: method === "GET" ? data : undefined,
-      headers,
+      data: method !== "GET" ? body : undefined,
+      params: method === "GET" ? body : undefined,
     });
 
     return response.data;

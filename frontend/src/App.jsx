@@ -99,7 +99,7 @@ function AppContent() {
 
   const handleLogout = async () => {
     try {
-      await api("/auth/logout", {});
+      await api("/auth/logout", {}, "POST");
       toast.info("Logged out successfully");
     } catch (e) {
       console.error(e);

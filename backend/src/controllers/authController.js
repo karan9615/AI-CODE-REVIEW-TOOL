@@ -17,6 +17,13 @@ export const login = async (req, res) => {
     // 2. Set token in HTTP-Only Session Cookie
     req.session.token = token;
 
+    // Log for debugging (remove in production)
+    console.log("Login successful:", {
+      userId: user.data.id,
+      username: user.data.username,
+      sessionSet: !!req.session.token,
+    });
+
     // 3. Return user info (BUT NOT THE TOKEN)
     res.json({
       success: true,

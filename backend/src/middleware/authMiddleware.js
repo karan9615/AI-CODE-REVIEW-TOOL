@@ -12,12 +12,21 @@ export const validateToken = (req, res, next) => {
     token = req.body.token;
   }
 
+  // Debug logging
+  if (!token) {
+    console.log("Auth failed:", {
+      path: req.path,
+      hasSession: !!req.session,
+      sessionToken: req.session?.token ? "PRESENT" : "MISSING",
+      hasCookie: !!req.headers.cookie,
+      hasAuthHeader: !!req.headers.authorization,
+    });
+  }
+
   if (!token || typeof token !== "string") {
-    return res
-      .status(401)
-      .json({
-        error: "Unauthorized: Valid GitLab Token required (Login first)",
-      });
+    return res.status(401).json({
+      error: "Unauthorized: Valid GitLab Token required (Login first)",
+    });
   }
 
   // Attach token to request object for downstream controllers

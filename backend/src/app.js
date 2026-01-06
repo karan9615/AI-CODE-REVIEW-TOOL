@@ -5,7 +5,6 @@ import rateLimit from "express-rate-limit";
 import hpp from "hpp";
 import morgan from "morgan";
 import cookieSession from "cookie-session";
-import cookieParser from "cookie-parser";
 import routes from "./routes/index.js";
 import envConfig from "../config/envConfig.js";
 
@@ -54,23 +53,26 @@ const limiter = rateLimit({
 });
 app.use("/api", limiter);
 
-// CORS
+// CORS - CRITICAL for cross-domain authentication
 app.use(
   cors({
     origin: envConfig.clientUrl,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true, // REQUIRED for cookies
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Set-Cookie"],
   })
 );
 
 // Body Parser with limits
 app.use(express.json({ limit: "10kb" }));
-app.use(cookieParser());
 
 // Cookie Session (HTTP-Only)
 // For cross-domain cookies (Netlify -> Render), we need secure + sameSite=none
+// NOTE: cookie-session handles cookie parsing internally - DO NOT use cookieParser()
 const isProduction = envConfig.nodeEnv === "production";
-const isCrossDomain = envConfig.clientUrl && !envConfig.clientUrl.includes("localhost");
+const isCrossDomain =
+  envConfig.clientUrl && !envConfig.clientUrl.includes("localhost");
 
 app.use(
   cookieSession({
@@ -101,16 +103,47 @@ app.get("/api/health", (req, res) => {
         isProduction,
       },
     },
+    debug: {
+      hasSession: !!req.session,
+      sessionToken: req.session?.token ? "SET" : "NOT_SET",
+      requestOrigin: req.headers.origin || "NO_ORIGIN",
+      cookieHeader: req.headers.cookie ? "PRESENT" : "MISSING",
+    },
   });
 });
 
 // Routes
 app.use("/api", routes);
 
+// 404 Handler - Must be after all routes
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Route not found",
+    path: req.path,
+    method: req.method,
+  });
+});
+
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong!" });
+  console.error("Error:", {
+    message: err.message,
+    path: req.path,
+    method: req.method,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  });
+
+  const statusCode = err.statusCode || 500;
+  const response = {
+    error: err.message || "Something went wrong!",
+  };
+
+  // Include stack trace in development
+  if (envConfig.nodeEnv === "development" && err.stack) {
+    response.stack = err.stack;
+  }
+
+  res.status(statusCode).json(response);
 });
 
 export default app;
