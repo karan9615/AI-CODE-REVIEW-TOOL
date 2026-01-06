@@ -16,9 +16,12 @@ export const validateToken = (req, res, next) => {
   if (!token) {
     console.log("Auth failed:", {
       path: req.path,
+      method: req.method,
+      origin: req.headers.origin,
       hasSession: !!req.session,
+      sessionKeys: req.session ? Object.keys(req.session) : [],
       sessionToken: req.session?.token ? "PRESENT" : "MISSING",
-      hasCookie: !!req.headers.cookie,
+      cookieHeader: req.headers.cookie || "NONE",
       hasAuthHeader: !!req.headers.authorization,
     });
   }

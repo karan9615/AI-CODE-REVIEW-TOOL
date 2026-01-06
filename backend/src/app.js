@@ -74,16 +74,45 @@ const isProduction = envConfig.nodeEnv === "production";
 const isCrossDomain =
   envConfig.clientUrl && !envConfig.clientUrl.includes("localhost");
 
+// Custom middleware to set partitioned cookies for cross-domain
 app.use(
   cookieSession({
     name: "session",
     keys: [envConfig.sessionSecret],
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    secure: isProduction || isCrossDomain, // Secure for production OR cross-domain (Render uses HTTPS)
+    secure: true, // ALWAYS true for production (Render uses HTTPS)
     httpOnly: true, // Prevents JS access
-    sameSite: isCrossDomain ? "none" : "lax", // 'none' required for cross-site cookies (Netlify <-> Render)
+    sameSite: isCrossDomain ? "none" : "lax", // 'none' required for cross-site cookies
+    path: "/", // Explicit path
   })
 );
+
+// CRITICAL: Add Partitioned attribute for Chrome's third-party cookie restrictions
+if (isCrossDomain) {
+  app.use((req, res, next) => {
+    const originalSetHeader = res.setHeader;
+    res.setHeader = function (name, value) {
+      if (name.toLowerCase() === "set-cookie") {
+        // Add Partitioned attribute to Set-Cookie header
+        if (Array.isArray(value)) {
+          value = value.map((cookie) =>
+            cookie.includes("SameSite=none") && !cookie.includes("Partitioned")
+              ? cookie + "; Partitioned"
+              : cookie
+          );
+        } else if (
+          typeof value === "string" &&
+          value.includes("SameSite=none") &&
+          !value.includes("Partitioned")
+        ) {
+          value = value + "; Partitioned";
+        }
+      }
+      return originalSetHeader.call(this, name, value);
+    };
+    next();
+  });
+}
 
 // Prevent Parameter Pollution
 app.use(hpp());
@@ -97,10 +126,11 @@ app.get("/api/health", (req, res) => {
       nodeEnv: envConfig.nodeEnv,
       clientUrl: envConfig.clientUrl,
       cookieSettings: {
-        secure: isProduction || isCrossDomain,
+        secure: true,
         sameSite: isCrossDomain ? "none" : "lax",
         isCrossDomain,
         isProduction,
+        partitioned: isCrossDomain, // Partitioned attribute added for cross-domain
       },
     },
     debug: {
