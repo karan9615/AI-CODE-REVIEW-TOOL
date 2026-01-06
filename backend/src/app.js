@@ -10,6 +10,9 @@ import envConfig from "../config/envConfig.js";
 
 const app = express();
 
+// TODO: Trust Proxy for Render/Heroku (Required for req.secure and rate limits)
+app.set("trust proxy", 1);
+
 // Secure Logger: Standard format but remove Authorization header from logs
 morgan.token("remote-addr", (req) => {
   return req.headers["x-forwarded-for"] || req.socket.remoteAddress;
@@ -53,6 +56,9 @@ const limiter = rateLimit({
 });
 app.use("/api", limiter);
 
+// Helper to normalize URLs (remove trailing slash)
+const normalizeUrl = (url) => (url ? url.replace(/\/$/, "") : "");
+
 // CORS - CRITICAL for cross-domain authentication
 app.use(
   cors({
@@ -60,10 +66,16 @@ app.use(
       // Allow requests with no origin (like mobile apps or curl)
       if (!origin) return callback(null, true);
 
-      // Check if origin is allowed
-      if (origin === envConfig.clientUrl) {
+      // Check if origin is allowed (handling trailing slashes)
+      const allowedOrigin = normalizeUrl(envConfig.clientUrl);
+      const requestOrigin = normalizeUrl(origin);
+
+      if (requestOrigin === allowedOrigin) {
         callback(null, true);
       } else {
+        console.warn(
+          `CORS blocked: ${origin} (Expected: ${envConfig.clientUrl})`
+        );
         callback(new Error("Not allowed by CORS"));
       }
     },

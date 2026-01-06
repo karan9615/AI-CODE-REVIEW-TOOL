@@ -57,5 +57,6 @@ export const checkAuth = (req, res) => {
   if (req.session?.token) {
     res.json({ authenticated: true });
   } else {
+    res.json({ authenticated: false });
   }
 };
