@@ -234,7 +234,8 @@ export const mrService = {
     let failCount = 0;
 
     // Post each comment individually (allows partial success)
-    for (const comment of comments) {
+    // Post comments in parallel to speed up the process
+    const postPromises = comments.map(async (comment) => {
       try {
         // Try posting as inline comment (attached to specific line)
         await gl.createInlineComment(
@@ -244,7 +245,7 @@ export const mrService = {
           { ...comment, ...shas },
           mrDiffs
         );
-        successCount++;
+        return true; // Success
       } catch (commentError) {
         logger.warn(
           `Failed to post inline comment on ${comment.filePath}: ${commentError.message}`
@@ -258,15 +259,19 @@ export const mrService = {
             mrIid,
             `**Review (${comment.filePath}):** ${comment.comment}`
           );
-          successCount++; // Count fallback as success
+          return true; // Success (fallback)
         } catch (fallbackError) {
           logger.error(
             `Failed to post fallback comment: ${fallbackError.message}`
           );
-          failCount++;
+          return false; // Failure
         }
       }
-    }
+    });
+
+    const results = await Promise.all(postPromises);
+    successCount = results.filter((r) => r === true).length;
+    failCount = results.filter((r) => r === false).length;
 
     logger.info(
       `Posted ${successCount}/${comments.length} comments successfully`

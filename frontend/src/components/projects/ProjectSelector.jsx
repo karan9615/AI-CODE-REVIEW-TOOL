@@ -7,14 +7,23 @@ import { Loader } from "../common/Loader";
 import { Alert } from "../common/Alert";
 import { Button } from "../ui/Button";
 
-export function ProjectSelector({ projects, loading, error, setProject, logout, onRetry }) {
+export function ProjectSelector({
+  projects,
+  loading,
+  error,
+  setProject,
+  logout,
+  onRetry,
+}) {
   const [search, setSearch] = useState("");
 
-  const filtered = projects.filter(
-    (p) =>
-      p.name?.toLowerCase().includes(search.toLowerCase()) ||
-      p.path_with_namespace?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = React.useMemo(() => {
+    return projects.filter(
+      (p) =>
+        p.name?.toLowerCase().includes(search.toLowerCase()) ||
+        p.path_with_namespace?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [projects, search]);
 
   return (
     <div className="min-h-screen bg-background pb-12 transition-colors duration-300">
@@ -41,7 +50,7 @@ export function ProjectSelector({ projects, loading, error, setProject, logout, 
 
         {/* Error State */}
         {error && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-6 max-w-2xl mx-auto"
@@ -92,9 +101,12 @@ export function ProjectSelector({ projects, loading, error, setProject, logout, 
                 <div className="w-20 h-20 mx-auto mb-6 bg-surface-muted/10 rounded-full flex items-center justify-center">
                   <Search size={32} className="text-surface-muted/50" />
                 </div>
-                <h3 className="text-xl font-semibold text-surface mb-2">No Projects Found</h3>
+                <h3 className="text-xl font-semibold text-surface mb-2">
+                  No Projects Found
+                </h3>
                 <p className="text-surface-muted mb-6">
-                  You don't have access to any GitLab projects with sufficient permissions.
+                  You don't have access to any GitLab projects with sufficient
+                  permissions.
                 </p>
                 <Button onClick={onRetry} disabled={loading} icon={RefreshCw}>
                   Refresh
@@ -123,7 +135,9 @@ export function ProjectSelector({ projects, loading, error, setProject, logout, 
                 {filtered.length === 0 && search && (
                   <div className="text-center py-20 text-surface-muted">
                     <Search size={48} className="mx-auto mb-4 opacity-30" />
-                    <p className="text-lg">No projects found matching "{search}"</p>
+                    <p className="text-lg">
+                      No projects found matching "{search}"
+                    </p>
                     <p className="text-sm mt-2">Try a different search term</p>
                   </div>
                 )}

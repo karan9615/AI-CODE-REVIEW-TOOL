@@ -224,19 +224,22 @@ function validateComment(comment, enrichedDiffs) {
     return null;
   }
 
-  const { addedLines, deletedLines } = createLineLookups(enrichedDiff);
+  const { addedLines, deletedLines, contextLines } =
+    createLineLookups(enrichedDiff);
   let isValid = false;
 
-  // Validate added line comments
+  // Validate added line comments (and context lines referenced by new line number)
   if (comment.line) {
     if (addedLines.has(comment.line)) {
       isValid = true;
+    } else if (contextLines.has(comment.line)) {
+      // It's a context line, which is valid for commenting
+      // We might need the oldLine for GitLab API if we want to be precise,
+      // but usually quoting the new line in the MR diff view works.
+      isValid = true;
     } else {
       console.warn(
-        `❌ ${comment.filePath}:${comment.line} - not an added line`
-      );
-      console.warn(
-        `   Available added lines: [${Array.from(addedLines).join(", ")}]`
+        `❌ ${comment.filePath}:${comment.line} - not in diff (added or context)`
       );
     }
   }
@@ -246,12 +249,19 @@ function validateComment(comment, enrichedDiffs) {
     if (deletedLines.has(comment.oldLine)) {
       isValid = true;
     } else {
-      console.warn(
-        `❌ ${comment.filePath}:${comment.oldLine} (oldLine) - not a deleted line`
+      // Check if it maps to a context line (reverse lookup optional, but usually oldLine is sufficient)
+      // For simplicity, we assume deleted lines MUST be in the deleted set.
+      // But context lines also have oldLine.
+      const isContext = Array.from(contextLines.values()).includes(
+        comment.oldLine
       );
-      console.warn(
-        `   Available deleted lines: [${Array.from(deletedLines).join(", ")}]`
-      );
+      if (isContext) {
+        isValid = true;
+      } else {
+        console.warn(
+          `❌ ${comment.filePath}:${comment.oldLine} (oldLine) - not in diff`
+        );
+      }
     }
   }
 
