@@ -30,6 +30,8 @@ function AppContent() {
       const data = await api("/auth/check", {}, "GET");
       if (data.authenticated) {
         setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
       }
     } catch (e) {
       console.warn("Session check failed", e);
@@ -89,10 +91,6 @@ function AppContent() {
         toast.error(msg);
       }
     } catch (err) {
-      const msg = err.message || "Login failed. Check your token.";
-      setError(msg);
-      toast.error(msg);
-    } finally {
       setLoading(false);
     }
   };

@@ -51,12 +51,11 @@ export const logout = (req, res) => {
 };
 
 /**
- * Check Auth: Verifies if a valid session exists.
+ * Check Auth: Verifies if a valid session cookie exists.
  */
 export const checkAuth = (req, res) => {
   if (req.session?.token) {
     res.json({ authenticated: true });
   } else {
-    res.json({ authenticated: false });
   }
 };

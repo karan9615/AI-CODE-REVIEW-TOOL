@@ -50,8 +50,7 @@ apiClient.interceptors.response.use(
 
 /**
  * Standardized API wrapper
- * Automatically handles error parsing
- * Uses cookie-based authentication (withCredentials: true)
+ * Uses HTTP-only cookies for authentication (withCredentials: true)
  */
 export const api = async (path, body = {}, method = "POST") => {
   try {
@@ -59,7 +58,8 @@ export const api = async (path, body = {}, method = "POST") => {
       method: method.toLowerCase(),
       url: path,
       data: method !== "GET" ? body : undefined,
-      params: method === "GET" ? body : undefined,
+      params: method !== "GET" ? body : undefined,
+      headers: {},
     });
 
     return response.data;

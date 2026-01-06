@@ -1,13 +1,13 @@
 export const validateToken = (req, res, next) => {
-  // 1. Check Cookies (Primary - Secure)
+  // 1. Check HTTP-Only Cookies (Primary - Secure for production)
   let token = req.session?.token;
 
-  // 2. Check Headers (Fallback - for cURL/Postman)
+  // 2. Check Headers (Fallback - for API testing/cURL)
   if (!token) {
-    token = req.headers.authorization?.split(" ")[1];
+    token = req.headers.authorization?.replace(/^Bearer\s+/i, "");
   }
 
-  // 3. Check Body (Legacy/Fallback)
+  // 3. Check Body (Fallback - for initial login)
   if (!token) {
     token = req.body.token;
   }

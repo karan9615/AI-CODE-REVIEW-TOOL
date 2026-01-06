@@ -56,11 +56,22 @@ app.use("/api", limiter);
 // CORS - CRITICAL for cross-domain authentication
 app.use(
   cors({
-    origin: envConfig.clientUrl,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+
+      // Check if origin is allowed
+      if (origin === envConfig.clientUrl) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true, // REQUIRED for cookies
     allowedHeaders: ["Content-Type", "Authorization"],
     exposedHeaders: ["Set-Cookie"],
+    maxAge: 86400, // Cache preflight for 24 hours
   })
 );
 
@@ -93,19 +104,26 @@ if (isCrossDomain) {
     const originalSetHeader = res.setHeader;
     res.setHeader = function (name, value) {
       if (name.toLowerCase() === "set-cookie") {
-        // Add Partitioned attribute to Set-Cookie header
+        // Add Partitioned attribute to Set-Cookie header (case-insensitive check)
         if (Array.isArray(value)) {
-          value = value.map((cookie) =>
-            cookie.includes("SameSite=none") && !cookie.includes("Partitioned")
-              ? cookie + "; Partitioned"
-              : cookie
-          );
-        } else if (
-          typeof value === "string" &&
-          value.includes("SameSite=none") &&
-          !value.includes("Partitioned")
-        ) {
-          value = value + "; Partitioned";
+          value = value.map((cookie) => {
+            const lowerCookie = cookie.toLowerCase();
+            if (
+              lowerCookie.includes("samesite=none") &&
+              !lowerCookie.includes("partitioned")
+            ) {
+              return cookie + "; Partitioned";
+            }
+            return cookie;
+          });
+        } else if (typeof value === "string") {
+          const lowerValue = value.toLowerCase();
+          if (
+            lowerValue.includes("samesite=none") &&
+            !lowerValue.includes("partitioned")
+          ) {
+            value = value + "; Partitioned";
+          }
         }
       }
       return originalSetHeader.call(this, name, value);
