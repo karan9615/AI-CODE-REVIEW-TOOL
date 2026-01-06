@@ -105,7 +105,27 @@ export const mrService = {
     const { base_sha, start_sha, head_sha } = diffRefs;
 
     // Step 5: Fetch detailed diffs for the MR
-    const mrDiffs = await gl.getDiffs(token, projectId, created.iid);
+    // Retry fetching diffs until they actually contain diff content (GitLab async calculation)
+    let mrDiffs = [];
+    let diffRetries = 5;
+
+    while (diffRetries > 0) {
+      mrDiffs = await gl.getDiffs(token, projectId, created.iid);
+
+      // Check if we have valid diff strings (at least one file has a diff)
+      const hasContent = mrDiffs.some((d) => d.diff && d.diff.length > 0);
+
+      if (hasContent || mrDiffs.length === 0) {
+        break;
+      }
+
+      logger.warn(
+        `Diff content empty for MR #${created.iid}, retrying... (${diffRetries})`
+      );
+      await new Promise((r) => setTimeout(r, 1000));
+      diffRetries--;
+    }
+
     logger.info(`Fetched ${mrDiffs.length} diffs for inline review`);
 
     // Step 6: Generate AI review comments

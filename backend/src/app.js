@@ -103,7 +103,7 @@ app.use(
     name: "session",
     keys: [envConfig.sessionSecret],
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    secure: true, // ALWAYS true for production (Render uses HTTPS)
+    secure: isProduction || isCrossDomain, // True for Prod/Render, False for localhost
     httpOnly: true, // Prevents JS access
     sameSite: isCrossDomain ? "none" : "lax", // 'none' required for cross-site cookies
     path: "/", // Explicit path

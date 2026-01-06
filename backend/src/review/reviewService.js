@@ -160,16 +160,25 @@ function buildEnrichedDiffs(diffs) {
 function createLineLookups(enrichedDiff) {
   const addedLines = new Set();
   const deletedLines = new Set();
+  const contextLines = new Set(); // Stores NEW line numbers for context
 
-  for (const change of enrichedDiff.changes) {
-    if (change.type === "added") {
-      addedLines.add(change.newLine);
-    } else if (change.type === "deleted") {
-      deletedLines.add(change.oldLine);
+  if (enrichedDiff.changes) {
+    for (const change of enrichedDiff.changes) {
+      if (change.type === "added") {
+        addedLines.add(change.newLine);
+      } else if (change.type === "deleted") {
+        deletedLines.add(change.oldLine);
+      }
     }
   }
 
-  return { addedLines, deletedLines };
+  if (enrichedDiff.contextLines) {
+    for (const ctx of enrichedDiff.contextLines) {
+      contextLines.add(ctx.newLine);
+    }
+  }
+
+  return { addedLines, deletedLines, contextLines };
 }
 
 /**
@@ -228,35 +237,61 @@ function validateComment(comment, enrichedDiffs) {
     createLineLookups(enrichedDiff);
   let isValid = false;
 
-  // Validate added line comments (and context lines referenced by new line number)
+  // Ensure line numbers are integers (AI sometimes returns strings)
+  if (comment.line) comment.line = parseInt(comment.line, 10);
+  if (comment.oldLine) comment.oldLine = parseInt(comment.oldLine, 10);
+
+  // Helper for fuzzy match
+  const checkLine = (line, set) => {
+    if (set.has(line)) return line;
+    // Check +/- 4 lines (generous fuzzy match)
+    for (let i = 1; i <= 4; i++) {
+      if (set.has(line + i)) return line + i;
+      if (set.has(line - i)) return line - i;
+    }
+    return null;
+  };
+
+  // Validate added line comments
   if (comment.line) {
-    if (addedLines.has(comment.line)) {
+    let matchedLine = checkLine(comment.line, addedLines);
+    if (!matchedLine) matchedLine = checkLine(comment.line, contextLines);
+
+    if (matchedLine) {
       isValid = true;
-    } else if (contextLines.has(comment.line)) {
-      // It's a context line, which is valid for commenting
-      // We might need the oldLine for GitLab API if we want to be precise,
-      // but usually quoting the new line in the MR diff view works.
-      isValid = true;
+      if (matchedLine !== comment.line) {
+        console.log(
+          `Auto-corrected line from ${comment.line} to ${matchedLine}`
+        );
+        comment.line = matchedLine;
+      }
     } else {
-      console.warn(
-        `❌ ${comment.filePath}:${comment.line} - not in diff (added or context)`
+      console.warn(`❌ ${comment.filePath}: Line ${comment.line} not found.`);
+      // Debug: print near misses?
+      const nearest = Array.from(addedLines).find(
+        (l) => Math.abs(l - comment.line) < 5
       );
+      if (nearest) console.log(`   (Nearest added line was ${nearest})`);
     }
   }
 
   // Validate deleted line comments
   if (comment.oldLine) {
-    if (deletedLines.has(comment.oldLine)) {
+    const matchedLine = checkLine(comment.oldLine, deletedLines);
+    if (matchedLine) {
       isValid = true;
+      if (matchedLine !== comment.oldLine) {
+        console.log(
+          `Auto-corrected oldLine from ${comment.oldLine} to ${matchedLine}`
+        );
+        comment.oldLine = matchedLine;
+      }
     } else {
-      // Check if it maps to a context line (reverse lookup optional, but usually oldLine is sufficient)
-      // For simplicity, we assume deleted lines MUST be in the deleted set.
-      // But context lines also have oldLine.
-      const isContext = Array.from(contextLines.values()).includes(
-        comment.oldLine
-      );
-      if (isContext) {
+      // Also check context for oldLine cases
+      const contextMatch = checkLine(comment.oldLine, contextLines);
+      if (contextMatch) {
         isValid = true;
+        // Note: contextLines tracks newLines, but often oldLine ~= newLine in context
       } else {
         console.warn(
           `❌ ${comment.filePath}:${comment.oldLine} (oldLine) - not in diff`
