@@ -241,6 +241,13 @@ export const getMRDetails = async (token, projectId, mrIid) =>
   (await client(token).get(`/projects/${projectId}/merge_requests/${mrIid}`))
     .data;
 
+export const getMRDiscussions = async (token, projectId, mrIid) =>
+  (
+    await client(token).get(
+      `/projects/${projectId}/merge_requests/${mrIid}/discussions`
+    )
+  ).data;
+
 export const getDiffRefsWithRetry = async (
   token,
   projectId,

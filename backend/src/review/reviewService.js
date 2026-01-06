@@ -315,7 +315,11 @@ function validateComment(comment, enrichedDiffs) {
 /**
  * Generate inline review comments
  */
-export async function generateInlineReviews(model, diffs) {
+export async function generateInlineReviews(
+  model,
+  diffs,
+  existingComments = []
+) {
   const enrichedDiffs = buildEnrichedDiffs(diffs);
   const rules = loadRules();
 
@@ -465,6 +469,7 @@ You have access to:
 - **changes**: Array of added/deleted lines with line numbers and content
 - **contextLines**: Surrounding unchanged code for context
 - **file metadata**: Whether file is new, deleted, renamed, or binary
+- **existingComments**: List of comments already posted on this MR
 
 Constraints:
 - Can only comment on lines in the "changes" array
@@ -472,9 +477,15 @@ Constraints:
 - For deleted lines: use "oldLine" property (old file line number)
 - Cannot comment on binary files
 - Comments must match the JSON schema exactly
+- **DO NOT REPEAT** feedback found in "EXISTING COMMENTS" list (unless the issue is critical and strictly worse now).
+  - If a similar comment exists on the same line, SKIP it.
+  - If the same issue is pointed out by a human or AI previously, SKIP it.
 
 # REVIEW RULES
 ${JSON.stringify(rules, null, 2)}
+
+# EXISTING COMMENTS (Check these to avoid duplicates)
+${JSON.stringify(existingComments || [], null, 2)}
 
 # CODE CHANGES
 ${JSON.stringify(enrichedDiffs, null, 2)}

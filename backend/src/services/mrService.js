@@ -192,11 +192,45 @@ export const mrService = {
       throw new Error("No diffs found for this merge request");
     }
 
-    // Step 4: Generate AI reviews
-    const comments = await generateInlineReviews(model, mrDiffs);
-    logger.info(`Generated ${comments.length} inline comments`);
+    // Step 4: Fetch existing comments to prevent duplicates (Context for AI)
+    let existingCommentsForAI = [];
+    try {
+      const existingDiscussions = await gl.getMRDiscussions(
+        token,
+        projectId,
+        mrIid
+      );
 
-    // If no issues found, post a success message
+      existingDiscussions.forEach((discussion) => {
+        discussion.notes.forEach((note) => {
+          if (note.position && note.position.new_path && note.body) {
+            const line = note.position.new_line || note.position.old_line;
+            // Only include relevant fields to save token context
+            existingCommentsForAI.push({
+              filePath: note.position.new_path,
+              line: line,
+              preview: note.body.substring(0, 100).replace(/\n/g, " "), // Condensed preview
+            });
+          }
+        });
+      });
+    } catch (err) {
+      logger.warn(
+        `Failed to fetch existing comments for context: ${err.message}`
+      );
+    }
+
+    // Step 5: Generate AI reviews
+    let comments = await generateInlineReviews(
+      model,
+      mrDiffs,
+      existingCommentsForAI
+    );
+    logger.info(
+      `Generated ${comments.length} inline comments (AI aware of ${existingCommentsForAI.length} existing)`
+    );
+
+    // If no issues found (after filtering), post a success message
     if (comments.length === 0) {
       await gl.comment(
         token,
