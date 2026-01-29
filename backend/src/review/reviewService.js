@@ -20,7 +20,7 @@ function loadRules() {
 /**
  * Generate MR title + description
  */
-export async function generateMRContent(model, diffs) {
+export async function generateMRContent(model, diffs, apiKey = null) {
   const rules = loadRules();
 
   const prompt = `You are a Senior Software Engineer reviewing a GitLab Merge Request.
@@ -60,6 +60,7 @@ ${JSON.stringify(diffs, null, 2)}
   try {
     return await runAI(model, prompt, {
       responseSchema: mrContentSchema,
+      apiKey,
     });
   } catch (error) {
     console.error("❌ MR Content Generation Failed:", error.message);
@@ -196,7 +197,7 @@ function validateCommentStructure(comment) {
     console.warn(
       `❌ Comment missing required Issue section on ${comment.filePath}:${
         comment.line || comment.oldLine
-      }`
+      }`,
     );
     console.warn(`   Comment preview: ${text.substring(0, 100)}...`);
     return false;
@@ -207,10 +208,10 @@ function validateCommentStructure(comment) {
     console.warn(
       `⚠️  Comment has Issue but missing optional sections on ${
         comment.filePath
-      }:${comment.line || comment.oldLine}`
+      }:${comment.line || comment.oldLine}`,
     );
     console.warn(
-      `   Missing: ${!hasRisk ? "Risk " : ""}${!hasFix ? "Fix" : ""}`
+      `   Missing: ${!hasRisk ? "Risk " : ""}${!hasFix ? "Fix" : ""}`,
     );
   }
 
@@ -261,7 +262,7 @@ function validateComment(comment, enrichedDiffs) {
       isValid = true;
       if (matchedLine !== comment.line) {
         console.log(
-          `Auto-corrected line from ${comment.line} to ${matchedLine}`
+          `Auto-corrected line from ${comment.line} to ${matchedLine}`,
         );
         comment.line = matchedLine;
       }
@@ -269,7 +270,7 @@ function validateComment(comment, enrichedDiffs) {
       console.warn(`❌ ${comment.filePath}: Line ${comment.line} not found.`);
       // Debug: print near misses?
       const nearest = Array.from(addedLines).find(
-        (l) => Math.abs(l - comment.line) < 5
+        (l) => Math.abs(l - comment.line) < 5,
       );
       if (nearest) console.log(`   (Nearest added line was ${nearest})`);
     }
@@ -282,7 +283,7 @@ function validateComment(comment, enrichedDiffs) {
       isValid = true;
       if (matchedLine !== comment.oldLine) {
         console.log(
-          `Auto-corrected oldLine from ${comment.oldLine} to ${matchedLine}`
+          `Auto-corrected oldLine from ${comment.oldLine} to ${matchedLine}`,
         );
         comment.oldLine = matchedLine;
       }
@@ -294,7 +295,7 @@ function validateComment(comment, enrichedDiffs) {
         // Note: contextLines tracks newLines, but often oldLine ~= newLine in context
       } else {
         console.warn(
-          `❌ ${comment.filePath}:${comment.oldLine} (oldLine) - not in diff`
+          `❌ ${comment.filePath}:${comment.oldLine} (oldLine) - not in diff`,
         );
       }
     }
@@ -318,7 +319,8 @@ function validateComment(comment, enrichedDiffs) {
 export async function generateInlineReviews(
   model,
   diffs,
-  existingComments = []
+  existingComments = [],
+  apiKey = null,
 ) {
   const enrichedDiffs = buildEnrichedDiffs(diffs);
   const rules = loadRules();
@@ -522,6 +524,7 @@ Focus on quality over quantity - one well-explained critical issue > ten vague c
   try {
     const comments = await runAI(model, prompt, {
       responseSchema: inlineReviewSchema,
+      apiKey,
     });
 
     if (!Array.isArray(comments)) {
@@ -536,13 +539,13 @@ Focus on quality over quantity - one well-explained critical issue > ten vague c
       .filter(Boolean);
 
     console.log(
-      `✅ Validated ${validComments.length}/${comments.length} inline comments (structure + line numbers)`
+      `✅ Validated ${validComments.length}/${comments.length} inline comments (structure + line numbers)`,
     );
     return validComments;
   } catch (error) {
     console.error(
       "❌ Unexpected error in generateInlineReviews:",
-      error.message
+      error.message,
     );
     return [];
   }

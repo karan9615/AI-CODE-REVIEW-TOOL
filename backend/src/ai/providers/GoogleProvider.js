@@ -34,9 +34,17 @@ export class GoogleProvider {
    * @returns {Promise<string>} The generated response
    */
   async generate(prompt, config = {}) {
-    if (!this.isAvailable()) {
+    const { apiKey } = config;
+    let client = this.client;
+
+    // improved: Use custom API key if provided
+    if (apiKey) {
+      client = new GoogleGenerativeAI(apiKey);
+    }
+
+    if (!client) {
       throw new Error(
-        "Google provider not configured. Please set GEMINI_API_KEY."
+        "Google provider not configured. Please set GEMINI_API_KEY or provide a custom key.",
       );
     }
 
@@ -61,7 +69,7 @@ export class GoogleProvider {
         generationConfig.responseMimeType = "application/json";
       }
 
-      const geminiModel = this.client.getGenerativeModel({
+      const geminiModel = client.getGenerativeModel({
         model,
         generationConfig,
       });

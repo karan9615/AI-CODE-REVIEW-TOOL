@@ -75,11 +75,12 @@ function AppContent() {
     }
   };
 
-  const handleLogin = async (username, token) => {
+  const handleLogin = async (username, token, apiKey) => {
     setLoading(true);
     setError(null);
     try {
-      const authResponse = await api("/auth/login", { token });
+      // Send apiKey to backend to be stored in Secure HTTP-Only Cookie
+      const authResponse = await api("/auth/login", { token, apiKey });
 
       if (authResponse.success) {
         setIsAuthenticated(true);

@@ -41,17 +41,21 @@ export const createMR = async (req, res) => {
     if (!model || !isValidModel(model)) {
       return res.status(400).json({
         error: `Valid model is required. Available: ${getValidModelKeys().join(
-          ", "
+          ", ",
         )}`,
       });
     }
+
+    // Extract custom AI API key from session (Secure Cookie) or headers (optional fallback)
+    const customApiKey = req.session?.apiKey || req.headers["x-ai-api-key"];
 
     // Call service layer for business logic
     const result = await mrService.createAndReviewMR(
       token,
       projectId,
       model,
-      mr
+      mr,
+      customApiKey,
     );
 
     // Send success response
@@ -89,17 +93,21 @@ export const reviewMR = async (req, res) => {
     if (!model || !isValidModel(model)) {
       return res.status(400).json({
         error: `Valid model is required. Available: ${getValidModelKeys().join(
-          ", "
+          ", ",
         )}`,
       });
     }
+
+    // Extract custom AI API key from session (Secure Cookie) or headers (optional fallback)
+    const customApiKey = req.session?.apiKey || req.headers["x-ai-api-key"];
 
     // Call service layer
     const result = await mrService.reviewExistingMR(
       token,
       projectId,
       mrIid,
-      model
+      model,
+      customApiKey,
     );
 
     // Send success response

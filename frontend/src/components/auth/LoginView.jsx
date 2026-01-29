@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
-import { Sparkles, GitBranch } from 'lucide-react';
-import { Alert } from '../common/Alert';
-import { Loader } from '../common/Loader';
-import { motion } from 'framer-motion';
-import { ThemeToggle } from '../common/ThemeToggle';
+import React, { useState } from "react";
+import { Sparkles, GitBranch } from "lucide-react";
+import { Alert } from "../common/Alert";
+import { Loader } from "../common/Loader";
+import { motion } from "framer-motion";
+import { ThemeToggle } from "../common/ThemeToggle";
 
 export function LoginView({ loading, error, onLogin }) {
   const [user, setUser] = useState("");
   const [token, setToken] = useState("");
+  const [apiKey, setApiKey] = useState("");
 
   const handleSubmit = () => {
-    if (token) onLogin(user, token);
+    if (token) onLogin(user, token, apiKey);
   };
 
   const handleKeyPress = (e) => {
@@ -19,7 +20,6 @@ export function LoginView({ loading, error, onLogin }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background transition-colors duration-300">
-
       {/* Theme Toggle - Absolute Top Right */}
       <div className="absolute top-6 right-6 z-50">
         <ThemeToggle />
@@ -47,19 +47,29 @@ export function LoginView({ loading, error, onLogin }) {
           >
             <Sparkles className="w-8 h-8 text-primary" />
           </motion.div>
-          <h1 className="text-3xl font-bold mb-2 tracking-tight gradient-text">GitLab AI Review</h1>
-          <p className="text-surface-muted font-medium">AI-powered code review for your merge requests</p>
+          <h1 className="text-3xl font-bold mb-2 tracking-tight gradient-text">
+            GitLab AI Review
+          </h1>
+          <p className="text-surface-muted font-medium">
+            AI-powered code review for your merge requests
+          </p>
         </div>
 
         {error && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mb-6">
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="mb-6"
+          >
             <Alert type="error">{error}</Alert>
           </motion.div>
         )}
 
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">Username or Email</label>
+            <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">
+              Username or Email
+            </label>
             <input
               className="input-field"
               placeholder="Enter your GitLab username"
@@ -84,15 +94,38 @@ export function LoginView({ loading, error, onLogin }) {
               disabled={loading}
             />
             <p className="text-xs text-surface-muted/70 mt-2 ml-1">
-              Create a token at GitLab → Settings → Access Tokens with 'api' scope
+              Create a token at GitLab → Settings → Access Tokens with 'api'
+              scope
             </p>
           </div>
 
+          <div>
+            <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">
+              AI API Key (Optional){" "}
+              <span className="text-surface-muted/50 text-xs font-normal">
+                - For your own billing
+              </span>
+            </label>
+            <input
+              type="password"
+              className="input-field"
+              placeholder="Gemini/OpenAI API Key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+          </div>
+
           <motion.button
-            whileHover={{ scale: 1.02, boxShadow: "0 0 20px rgba(124, 58, 237, 0.4)" }}
+            whileHover={{
+              scale: 1.02,
+              boxShadow: "0 0 20px rgba(124, 58, 237, 0.4)",
+            }}
             whileTap={{ scale: 0.98 }}
-            className={`w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl text-white font-semibold transition-all shadow-lg shadow-primary/20 border border-primary/50 relative overflow-hidden group ${loading ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary hover:bg-primary-hover'
-              }`}
+            className={`w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl text-white font-semibold transition-all shadow-lg shadow-primary/20 border border-primary/50 relative overflow-hidden group ${
+              loading
+                ? "bg-primary/50 cursor-not-allowed"
+                : "bg-primary hover:bg-primary-hover"
+            }`}
             onClick={handleSubmit}
             disabled={loading}
           >

@@ -42,7 +42,8 @@ export const mrService = {
     token,
     projectId,
     model,
-    { source_branch, target_branch }
+    { source_branch, target_branch },
+    apiKey = null,
   ) {
     logger.info(`Creating MR: ${source_branch} -> ${target_branch}`);
 
@@ -51,7 +52,7 @@ export const mrService = {
       token,
       projectId,
       target_branch, // Base branch
-      source_branch // Branch with changes
+      source_branch, // Branch with changes
     );
 
     if (!diffs || diffs.length === 0) {
@@ -61,7 +62,11 @@ export const mrService = {
     logger.info(`Found ${diffs.length} file changes`);
 
     // Step 2: Generate MR title and description using AI
-    const { title, description } = await generateMRContent(model, diffs);
+    const { title, description } = await generateMRContent(
+      model,
+      diffs,
+      apiKey,
+    );
     logger.info(`Generated MR title: ${title}`);
 
     // Step 3: Create the Merge Request
@@ -86,7 +91,7 @@ export const mrService = {
     // If still not ready, skip inline comments (MR is still created)
     if (!diffRefs?.base_sha || !diffRefs?.head_sha) {
       logger.warn(
-        `diff_refs not available for MR #${created.iid}. Skipping inline comments.`
+        `diff_refs not available for MR #${created.iid}. Skipping inline comments.`,
       );
       return {
         success: true,
@@ -120,7 +125,7 @@ export const mrService = {
       }
 
       logger.warn(
-        `Diff content empty for MR #${created.iid}, retrying... (${diffRetries})`
+        `Diff content empty for MR #${created.iid}, retrying... (${diffRetries})`,
       );
       await new Promise((r) => setTimeout(r, 1000));
       diffRetries--;
@@ -129,7 +134,7 @@ export const mrService = {
     logger.info(`Fetched ${mrDiffs.length} diffs for inline review`);
 
     // Step 6: Generate AI review comments
-    const comments = await generateInlineReviews(model, mrDiffs);
+    const comments = await generateInlineReviews(model, mrDiffs, [], apiKey);
     logger.info(`Generated ${comments.length} inline comments`);
 
     // Step 7: Post inline comments (with error handling per comment)
@@ -139,7 +144,7 @@ export const mrService = {
       created.iid,
       comments,
       mrDiffs,
-      { base_sha, start_sha, head_sha }
+      { base_sha, start_sha, head_sha },
     );
 
     return {
@@ -159,7 +164,7 @@ export const mrService = {
    * @param {string} model - AI model name
    * @returns {Promise<Object>} Result object with comment statistics
    */
-  async reviewExistingMR(token, projectId, mrIid, model) {
+  async reviewExistingMR(token, projectId, mrIid, model, apiKey = null) {
     logger.info(`Starting AI review for MR #${mrIid}`);
 
     // Step 1: Get MR details and validate state
@@ -178,7 +183,7 @@ export const mrService = {
 
     if (!diffRefs?.base_sha || !diffRefs?.head_sha) {
       throw new Error(
-        "MR diff_refs not ready yet. Please try again in a few seconds."
+        "MR diff_refs not ready yet. Please try again in a few seconds.",
       );
     }
 
@@ -198,7 +203,7 @@ export const mrService = {
       const existingDiscussions = await gl.getMRDiscussions(
         token,
         projectId,
-        mrIid
+        mrIid,
       );
 
       existingDiscussions.forEach((discussion) => {
@@ -216,7 +221,7 @@ export const mrService = {
       });
     } catch (err) {
       logger.warn(
-        `Failed to fetch existing comments for context: ${err.message}`
+        `Failed to fetch existing comments for context: ${err.message}`,
       );
     }
 
@@ -224,10 +229,11 @@ export const mrService = {
     let comments = await generateInlineReviews(
       model,
       mrDiffs,
-      existingCommentsForAI
+      existingCommentsForAI,
+      apiKey,
     );
     logger.info(
-      `Generated ${comments.length} inline comments (AI aware of ${existingCommentsForAI.length} existing)`
+      `Generated ${comments.length} inline comments (AI aware of ${existingCommentsForAI.length} existing)`,
     );
 
     // If no issues found (after filtering), post a success message
@@ -236,7 +242,7 @@ export const mrService = {
         token,
         projectId,
         mrIid,
-        "✅ **AI Review Complete**: No major issues found. The code looks good!"
+        "✅ **AI Review Complete**: No major issues found. The code looks good!",
       );
 
       return {
@@ -258,7 +264,7 @@ export const mrService = {
       mrIid,
       comments,
       mrDiffs,
-      { base_sha, start_sha, head_sha }
+      { base_sha, start_sha, head_sha },
     );
 
     return {
@@ -297,12 +303,12 @@ export const mrService = {
           projectId,
           mrIid,
           { ...comment, ...shas },
-          mrDiffs
+          mrDiffs,
         );
         return true; // Success
       } catch (commentError) {
         logger.warn(
-          `Failed to post inline comment on ${comment.filePath}: ${commentError.message}`
+          `Failed to post inline comment on ${comment.filePath}: ${commentError.message}`,
         );
 
         try {
@@ -311,12 +317,12 @@ export const mrService = {
             token,
             projectId,
             mrIid,
-            `**Review (${comment.filePath}):** ${comment.comment}`
+            `**Review (${comment.filePath}):** ${comment.comment}`,
           );
           return true; // Success (fallback)
         } catch (fallbackError) {
           logger.error(
-            `Failed to post fallback comment: ${fallbackError.message}`
+            `Failed to post fallback comment: ${fallbackError.message}`,
           );
           return false; // Failure
         }
@@ -328,7 +334,7 @@ export const mrService = {
     failCount = results.filter((r) => r === false).length;
 
     logger.info(
-      `Posted ${successCount}/${comments.length} comments successfully`
+      `Posted ${successCount}/${comments.length} comments successfully`,
     );
 
     return {

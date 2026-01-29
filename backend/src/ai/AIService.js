@@ -37,7 +37,7 @@ export class AIService {
 
     if (!modelConfig) {
       throw new Error(
-        `Invalid model key: "${modelKey}". Please check available models in configuration.`
+        `Invalid model key: "${modelKey}". Please check available models in configuration.`,
       );
     }
 
@@ -46,14 +46,15 @@ export class AIService {
 
     if (!provider) {
       throw new Error(
-        `Provider "${modelConfig.provider}" not found in registry. Please add it to PROVIDER_REGISTRY.`
+        `Provider "${modelConfig.provider}" not found in registry. Please add it to PROVIDER_REGISTRY.`,
       );
     }
 
     // Check if provider is available (API key configured)
-    if (!provider.isAvailable()) {
+    // We allow proceeding if a custom apiKey is provided, even if the system-level key is missing
+    if (!provider.isAvailable() && !customConfig.apiKey) {
       throw new Error(
-        `Provider "${provider.name}" is not available. Please configure the required API key.`
+        `Provider "${provider.name}" is not available. Please configure the required API key or provide a custom key.`,
       );
     }
 
@@ -64,7 +65,7 @@ export class AIService {
     };
 
     console.log(
-      `🤖 Generating with ${provider.name} (${modelConfig.config.model})...`
+      `🤖 Generating with ${provider.name} (${modelConfig.config.model})...`,
     );
 
     // Generate using the provider

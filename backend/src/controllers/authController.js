@@ -4,7 +4,7 @@ import { client } from "../gitlab/gitlabClient.js";
  * Login: Validates token with GitLab and sets a secure HTTP-only cookie.
  */
 export const login = async (req, res) => {
-  const { token } = req.body;
+  const { token, apiKey } = req.body;
 
   if (!token) {
     return res.status(400).json({ error: "Token is required" });
@@ -14,8 +14,13 @@ export const login = async (req, res) => {
     // 1. Validate token by fetching user profile
     const user = await client(token).get("/user");
 
-    // 2. Set token in HTTP-Only Session Cookie
+    // 2. Set token and optional API key in HTTP-Only Session Cookie
     req.session.token = token;
+    if (apiKey) {
+      req.session.apiKey = apiKey;
+    } else {
+      delete req.session.apiKey; // Clear if not provided
+    }
 
     // Log for debugging
     console.log("Login successful:", {

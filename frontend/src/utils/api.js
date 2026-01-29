@@ -23,7 +23,7 @@ apiClient.interceptors.request.use(
   (error) => {
     console.error("Request error:", error);
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor for debugging and global error handling
@@ -34,7 +34,7 @@ apiClient.interceptors.response.use(
       {
         status: response.status,
         data: response.data,
-      }
+      },
     );
     return response;
   },
@@ -45,7 +45,7 @@ apiClient.interceptors.response.use(
       });
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 /**

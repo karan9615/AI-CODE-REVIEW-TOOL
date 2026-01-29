@@ -33,9 +33,16 @@ export class OpenAIProvider {
    * @returns {Promise<string>} The generated response
    */
   async generate(prompt, config = {}) {
-    if (!this.isAvailable()) {
+    const { apiKey } = config;
+    let client = this.client;
+
+    if (apiKey) {
+      client = new OpenAI({ apiKey });
+    }
+
+    if (!client) {
       throw new Error(
-        "OpenAI provider not configured. Please set OPENAI_API_KEY."
+        "OpenAI provider not configured. Please set OPENAI_API_KEY or provide a custom key.",
       );
     }
 
@@ -79,9 +86,7 @@ export class OpenAIProvider {
     }
 
     try {
-      const response = await this.client.chat.completions.create(
-        completionConfig
-      );
+      const response = await client.chat.completions.create(completionConfig);
 
       return response.choices[0].message.content;
     } catch (error) {
