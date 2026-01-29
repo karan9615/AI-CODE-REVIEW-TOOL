@@ -161,7 +161,8 @@ function buildEnrichedDiffs(diffs) {
 function createLineLookups(enrichedDiff) {
   const addedLines = new Set();
   const deletedLines = new Set();
-  const contextLines = new Set(); // Stores NEW line numbers for context
+  const contextNewLines = new Set();
+  const contextOldLines = new Set();
 
   if (enrichedDiff.changes) {
     for (const change of enrichedDiff.changes) {
@@ -175,11 +176,12 @@ function createLineLookups(enrichedDiff) {
 
   if (enrichedDiff.contextLines) {
     for (const ctx of enrichedDiff.contextLines) {
-      contextLines.add(ctx.newLine);
+      contextNewLines.add(ctx.newLine);
+      contextOldLines.add(ctx.oldLine);
     }
   }
 
-  return { addedLines, deletedLines, contextLines };
+  return { addedLines, deletedLines, contextNewLines, contextOldLines };
 }
 
 /**
@@ -221,6 +223,9 @@ function validateCommentStructure(comment) {
 /**
  * Validate a single comment against enriched diff data
  */
+/**
+ * Validate a single comment against enriched diff data
+ */
 function validateComment(comment, enrichedDiffs) {
   const enrichedDiff = enrichedDiffs.find((d) => d.file === comment.filePath);
 
@@ -234,75 +239,129 @@ function validateComment(comment, enrichedDiffs) {
     return null;
   }
 
-  const { addedLines, deletedLines, contextLines } =
+  const { addedLines, deletedLines, contextNewLines, contextOldLines } =
     createLineLookups(enrichedDiff);
+
   let isValid = false;
 
-  // Ensure line numbers are integers (AI sometimes returns strings)
-  if (comment.line) comment.line = parseInt(comment.line, 10);
-  if (comment.oldLine) comment.oldLine = parseInt(comment.oldLine, 10);
+  // Ensure line numbers are integers
+  if (comment.line !== undefined && comment.line !== null)
+    comment.line = parseInt(comment.line, 10);
+  if (comment.oldLine !== undefined && comment.oldLine !== null)
+    comment.oldLine = parseInt(comment.oldLine, 10);
 
-  // Helper for fuzzy match
-  const checkLine = (line, set) => {
-    if (set.has(line)) return line;
-    // Check +/- 4 lines (generous fuzzy match)
-    for (let i = 1; i <= 4; i++) {
-      if (set.has(line + i)) return line + i;
-      if (set.has(line - i)) return line - i;
+  // Helper: Find closest valid line
+  const findClosestLine = (target, validSet) => {
+    let closest = null;
+    let minDiff = Infinity;
+    for (const validLine of validSet) {
+      const diff = Math.abs(validLine - target);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = validLine;
+      }
     }
-    return null;
+    // Snap if within reasonable distance (e.g., 50 lines - broad catch)
+    return minDiff <= 50 ? closest : null;
   };
 
-  // Validate added line comments
-  if (comment.line) {
-    let matchedLine = checkLine(comment.line, addedLines);
-    if (!matchedLine) matchedLine = checkLine(comment.line, contextLines);
+  // 0. HANDLE MISSING LINE NUMBERS (Force Snap to First Change)
+  if (!comment.line && !comment.oldLine) {
+    console.warn(
+      `⚠️ No line number provided for ${comment.filePath}. Attempting to snap to first available change.`,
+    );
 
-    if (matchedLine) {
-      isValid = true;
-      if (matchedLine !== comment.line) {
-        console.log(
-          `Auto-corrected line from ${comment.line} to ${matchedLine}`,
-        );
-        comment.line = matchedLine;
-      }
+    // Prefer Added Line -> New Context Line -> Old Deleted Line
+    const firstAdded = addedLines.values().next().value;
+    const firstContext = contextNewLines.values().next().value;
+
+    if (firstAdded) {
+      comment.line = firstAdded;
+      comment.comment = `**(General File Feedback)** ${comment.comment}`;
+      console.log(`📍 Output snapped to first added line: ${firstAdded}`);
+    } else if (firstContext) {
+      comment.line = firstContext;
+      comment.comment = `**(General File Feedback)** ${comment.comment}`;
+      console.log(`📍 Output snapped to first context line: ${firstContext}`);
     } else {
-      console.warn(`❌ ${comment.filePath}: Line ${comment.line} not found.`);
-      // Debug: print near misses?
-      const nearest = Array.from(addedLines).find(
-        (l) => Math.abs(l - comment.line) < 5,
-      );
-      if (nearest) console.log(`   (Nearest added line was ${nearest})`);
+      // Try old lines
+      const firstDeleted = deletedLines.values().next().value;
+      const firstOldContext = contextOldLines.values().next().value;
+
+      if (firstDeleted) {
+        comment.oldLine = firstDeleted;
+        comment.comment = `**(General File Feedback)** ${comment.comment}`;
+        console.log(`📍 Output snapped to first deleted line: ${firstDeleted}`);
+      } else if (firstOldContext) {
+        comment.oldLine = firstOldContext;
+        comment.comment = `**(General File Feedback)** ${comment.comment}`;
+        console.log(
+          `📍 Output snapped to first (old) context line: ${firstOldContext}`,
+        );
+      } else {
+        console.error(
+          `❌ No valid lines found in ${comment.filePath} to attach comment.`,
+        );
+        return comment; // Fallback to general
+      }
     }
   }
 
-  // Validate deleted line comments
-  if (comment.oldLine) {
-    const matchedLine = checkLine(comment.oldLine, deletedLines);
-    if (matchedLine) {
+  // 1. Validating "New" Line References (Added lines or Context lines via new_line)
+  if (comment.line) {
+    // Combine added and context lines into one valid set for "new_line"
+    const validNewLines = new Set([...addedLines, ...contextNewLines]);
+
+    if (validNewLines.has(comment.line)) {
       isValid = true;
-      if (matchedLine !== comment.oldLine) {
-        console.log(
-          `Auto-corrected oldLine from ${comment.oldLine} to ${matchedLine}`,
-        );
-        comment.oldLine = matchedLine;
-      }
     } else {
-      // Also check context for oldLine cases
-      const contextMatch = checkLine(comment.oldLine, contextLines);
-      if (contextMatch) {
+      // Not found? Snap to nearest
+      const snapped = findClosestLine(comment.line, validNewLines);
+      if (snapped) {
+        console.log(
+          `📍 Snapping comment on ${comment.filePath}: Line ${comment.line} -> ${snapped}`,
+        );
+        comment.comment = `**(Ref: Line ${comment.line})** ${comment.comment}`;
+        comment.line = snapped;
         isValid = true;
-        // Note: contextLines tracks newLines, but often oldLine ~= newLine in context
       } else {
         console.warn(
-          `❌ ${comment.filePath}:${comment.oldLine} (oldLine) - not in diff`,
+          `❌ ${comment.filePath}: Line ${comment.line} is too far from any valid diff line.`,
+        );
+      }
+    }
+  }
+
+  // 2. Validating "Old" Line References (Deleted lines or Context lines via old_line)
+  if (comment.oldLine && !isValid) {
+    // Combine deleted and context lines (using old index) into one valid set
+    const validOldLines = new Set([...deletedLines, ...contextOldLines]);
+
+    if (validOldLines.has(comment.oldLine)) {
+      isValid = true;
+    } else {
+      // Not found? Snap to nearest
+      const snapped = findClosestLine(comment.oldLine, validOldLines);
+      if (snapped) {
+        console.log(
+          `📍 Snapping comment on ${comment.filePath}: OldLine ${comment.oldLine} -> ${snapped}`,
+        );
+        comment.comment = `**(Ref: OldLine ${comment.oldLine})** ${comment.comment}`;
+        comment.oldLine = snapped;
+        isValid = true;
+      } else {
+        console.warn(
+          `❌ ${comment.filePath}: OldLine ${comment.oldLine} is too far from any valid diff line.`,
         );
       }
     }
   }
 
   if (!isValid) {
-    return null;
+    console.warn(
+      `⚠️ Line validation failed for ${comment.filePath}:${comment.line || comment.oldLine}. Preserving as fallback comment.`,
+    );
+    return comment;
   }
 
   // Add file metadata for renamed/deleted files
@@ -325,11 +384,23 @@ export async function generateInlineReviews(
   const enrichedDiffs = buildEnrichedDiffs(diffs);
   const rules = loadRules();
 
+  // 1. Generate Global Context
+  const globalFileContext = enrichedDiffs
+    .map(
+      (d) =>
+        `- ${d.file} (${d.isNew ? "New" : d.isDeleted ? "Deleted" : "Modified"})`,
+    )
+    .join("\n");
+
   const prompt = `
 You are a **Senior Software Engineer** doing a critical code review for a GitLab Merge Request for production deployment.
 
 # MISSION
 Review the code changes below and ONLY generate actionable, specific comments that require the developer to update or improve the code. Do NOT add info comments, explanations, or compliments. Only comment if a real, actionable change is needed.
+
+# GLOBAL CONTEXT (Full MR Overview)
+The following files are part of this Merge Request. Use this context to understand relationships between files, even if they are in different chunks:
+${globalFileContext}
 
 # REVIEW PRIORITIES (in order)
 
@@ -403,7 +474,7 @@ Note: Since you only have access to git diffs (not full codebase), you may not a
   "filePath": "src/auth/login.js",
   "line": 42,
   "severity": "critical",
-  "comment": "**Issue:** SQL injection vulnerability - user input concatenated directly into query string.\n\n**Risk:** Attacker can execute arbitrary SQL commands, dump database, or delete all data.\n\n**Fix:** Use parameterized queries:\n\`\`\`javascript\nconst result = await db.query(\n  'SELECT * FROM users WHERE email = $1',\n  [userEmail]\n);\n\`\`\`"
+  "comment": "**Issue:** SQL injection vulnerability - user input concatenated directly into query string.\\n\\n**Risk:** Attacker can execute arbitrary SQL commands, dump database, or delete all data.\\n\\n**Fix:** Use parameterized queries:\\n\`\`\`javascript\\nconst result = await db.query(\\n  'SELECT * FROM users WHERE email = $1',\\n  [userEmail]\\n);\\n\`\`\`"
 }
 
 ## Example (ACCEPTABLE - Issue + Risk only):
@@ -411,7 +482,7 @@ Note: Since you only have access to git diffs (not full codebase), you may not a
   "filePath": "src/utils/helper.js",
   "line": 15,
   "severity": "high",
-  "comment": "**Issue:** The \`count\` parameter is not validated before use.\n\n**Risk:** Passing negative or non-numeric values will cause runtime errors or unexpected behavior."
+  "comment": "**Issue:** The \`count\` parameter is not validated before use.\\n\\n**Risk:** Passing negative or non-numeric values will cause runtime errors or unexpected behavior."
 }
 
 ## Invalid Example:
@@ -424,7 +495,7 @@ Note: Since you only have access to git diffs (not full codebase), you may not a
 - ALWAYS include Issue section (mandatory)
 - Include Risk section when the impact is clear
 - Include Fix section with copy-pasteable code when you have enough context
-- Use double newlines (\n\n) between sections when including multiple
+- Use double newlines (\\n\\n) between sections when including multiple
 - Comment ONLY on changed lines (added or deleted)
 - Reference actual line numbers from the diff
 - Focus on correctness, security, and performance
@@ -489,9 +560,6 @@ ${JSON.stringify(rules, null, 2)}
 # EXISTING COMMENTS (Check these to avoid duplicates)
 ${JSON.stringify(existingComments || [], null, 2)}
 
-# CODE CHANGES
-${JSON.stringify(enrichedDiffs, null, 2)}
-
 # OUTPUT FORMAT (STRICT REQUIREMENTS)
 
 Return a JSON array where EVERY comment object MUST have:
@@ -521,32 +589,114 @@ If zero actionable issues found, return empty array: []
 Focus on quality over quantity - one well-explained critical issue > ten vague comments.
 `;
 
-  try {
-    const comments = await runAI(model, prompt, {
-      responseSchema: inlineReviewSchema,
-      apiKey,
-    });
+  // Chunking logic to handle large MRs
+  const MAX_CHARS_PER_CHUNK = 25000; // Smaller chunks = Deeper attention
+  const allComments = [];
 
-    if (!Array.isArray(comments)) {
-      console.warn("AI returned valid JSON but not an array");
-      return [];
+  // Helper to calculate size
+  const getDiffSize = (d) => JSON.stringify(d).length;
+
+  let currentChunk = [];
+  let currentSize = 0;
+  const chunks = [];
+
+  for (const diff of enrichedDiffs) {
+    // Corrected from EnrichedDiffs
+    const diffSize = getDiffSize(diff);
+    // Keep files together in chunks
+    if (
+      currentSize + diffSize > MAX_CHARS_PER_CHUNK &&
+      currentChunk.length > 0
+    ) {
+      chunks.push(currentChunk);
+      currentChunk = [];
+      currentSize = 0;
+    }
+    currentChunk.push(diff);
+    currentSize += diffSize;
+  }
+  if (currentChunk.length > 0) chunks.push(currentChunk);
+
+  console.log(
+    `Phase: Reviewing ${enrichedDiffs.length} files in ${chunks.length} chunks...`,
+  );
+
+  // Sequential Processing to respect API Rate Limits (Critical for Free Tier users)
+  const DELAY_BETWEEN_CHUNKS = 2000; // 2 seconds delay between chunks
+
+  for (const [index, chunk] of chunks.entries()) {
+    console.log(`Phase: Processing chunk ${index + 1}/${chunks.length}...`);
+
+    const chunkPrompt = `
+    ${prompt}
+    
+# CODE CHANGES (PART ${index + 1} of ${chunks.length})
+${JSON.stringify(chunk, null, 2)}
+`;
+
+    let attempts = 0;
+    let success = false;
+
+    while (attempts < 3 && !success) {
+      try {
+        attempts++;
+        const chunkComments = await runAI(model, chunkPrompt, {
+          responseSchema: inlineReviewSchema,
+          apiKey,
+        });
+
+        if (Array.isArray(chunkComments)) {
+          allComments.push(...chunkComments);
+          success = true;
+        } else {
+          throw new Error("AI returned valid JSON but not an array");
+        }
+      } catch (e) {
+        console.error(
+          `❌ Error in chunk ${index + 1} (Attempt ${attempts}/3):`,
+          e.message,
+        );
+
+        // Smart handling for Rate Limits (429)
+        const isRateLimit =
+          e.message.includes("429") || e.message.includes("quota");
+        const baseBackoff = isRateLimit ? 5000 : 2000; // Wait longer for rate limits
+
+        if (attempts < 3) {
+          const backoff = baseBackoff * Math.pow(2, attempts - 1);
+          console.log(`⏳ Waiting ${backoff}ms before retry...`);
+          await new Promise((r) => setTimeout(r, backoff));
+        }
+      }
     }
 
-    // Validate and filter comments
-    const validComments = comments
-      .filter((comment) => validateCommentStructure(comment))
-      .map((comment) => validateComment(comment, enrichedDiffs))
-      .filter(Boolean);
+    if (!success) {
+      console.error(
+        `🚨 Fatal: Failed to process chunk ${index + 1} after 3 attempts. Review incomplete for this section.`,
+      );
+    }
 
-    console.log(
-      `✅ Validated ${validComments.length}/${comments.length} inline comments (structure + line numbers)`,
-    );
-    return validComments;
-  } catch (error) {
-    console.error(
-      "❌ Unexpected error in generateInlineReviews:",
-      error.message,
-    );
+    // Add delay between successful chunks to avoid hitting throughput limits
+    if (index < chunks.length - 1) {
+      await new Promise((r) => setTimeout(r, DELAY_BETWEEN_CHUNKS));
+    }
+  }
+
+  const comments = allComments;
+
+  if (!Array.isArray(comments)) {
+    console.warn("AI returned valid JSON but not an array");
     return [];
   }
+
+  // Validate and filter comments
+  const validComments = comments
+    .filter((comment) => validateCommentStructure(comment))
+    .map((comment) => validateComment(comment, enrichedDiffs))
+    .filter(Boolean);
+
+  console.log(
+    `✅ Validated ${validComments.length}/${comments.length} inline comments (structure + line numbers)`,
+  );
+  return validComments;
 }

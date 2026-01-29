@@ -7,7 +7,7 @@ export const getProjects = async (token) =>
 export const getBranches = async (token, projectId) =>
   (
     await client(token).get(
-      `/projects/${projectId}/repository/branches?per_page=100&sort=updated_desc`
+      `/projects/${projectId}/repository/branches?per_page=100&sort=updated_desc`,
     )
   ).data;
 
@@ -17,7 +17,7 @@ export const createMR = async (token, pid, payload) =>
 export const getDiffs = async (token, projectId, mrIid) =>
   (
     await client(token).get(
-      `/projects/${projectId}/merge_requests/${mrIid}/changes`
+      `/projects/${projectId}/merge_requests/${mrIid}/changes`,
     )
   ).data.changes;
 
@@ -51,7 +51,7 @@ export const getMergeRequests = async (token, projectId, options = {}) => {
           order_by: orderBy,
           sort,
         },
-      }
+      },
     );
 
     return response.data;
@@ -99,7 +99,7 @@ export const createInlineComment = async (
   projectId,
   mrIid,
   comment,
-  mrDiffs = []
+  mrDiffs = [],
 ) => {
   const {
     filePath,
@@ -115,13 +115,13 @@ export const createInlineComment = async (
   // Validate required fields
   if (!filePath || !body || !base_sha || !head_sha) {
     throw new Error(
-      "Missing required fields: filePath, body, base_sha, head_sha"
+      "Missing required fields: filePath, body, base_sha, head_sha",
     );
   }
 
   // Find the diff for this file
   const targetDiff = mrDiffs.find(
-    (d) => d.new_path === filePath || d.old_path === (oldPath || filePath)
+    (d) => d.new_path === filePath || d.old_path === (oldPath || filePath),
   );
 
   if (!targetDiff) {
@@ -141,18 +141,20 @@ export const createInlineComment = async (
   let useOldLine = false;
 
   if (line && !oldLine) {
-    // Check if this line was added
-    if (diffData.addedLines.has(line)) {
+    // Check if this line was added or is context
+    if (diffData.addedLines.has(line) || diffData.contextLines.has(line)) {
       finalLine = line;
     } else if (diffData.deletedLines.has(line)) {
       // Line was actually deleted, use old_line
       finalOldLine = line;
       useOldLine = true;
       console.log(
-        `Auto-corrected: ${filePath} line ${line} is a deletion, using old_line`
+        `Auto-corrected: ${filePath} line ${line} is a deletion, using old_line`,
       );
     } else {
-      throw new Error(`Line ${line} in ${filePath} is not a changed line`);
+      throw new Error(
+        `Line ${line} in ${filePath} is not a valid line (not added, deleted, or context)`,
+      );
     }
   } else if (oldLine && !line) {
     // Deleted line
@@ -161,19 +163,19 @@ export const createInlineComment = async (
       useOldLine = true;
     } else {
       throw new Error(
-        `Old line ${oldLine} in ${filePath} is not a deleted line`
+        `Old line ${oldLine} in ${filePath} is not a deleted line`,
       );
     }
   } else if (line && oldLine) {
     // Both provided - prefer the one that matches diff
-    if (diffData.addedLines.has(line)) {
+    if (diffData.addedLines.has(line) || diffData.contextLines.has(line)) {
       finalLine = line;
     } else if (diffData.deletedLines.has(oldLine)) {
       finalOldLine = oldLine;
       useOldLine = true;
     } else {
       throw new Error(
-        `Neither line ${line} nor oldLine ${oldLine} found in ${filePath} changes`
+        `Neither line ${line} nor oldLine ${oldLine} found in ${filePath} changes`,
       );
     }
   } else {
@@ -202,7 +204,7 @@ export const createInlineComment = async (
   try {
     const response = await client(token).post(
       `/projects/${projectId}/merge_requests/${mrIid}/discussions`,
-      { body, position }
+      { body, position },
     );
     return response.data;
   } catch (error) {
@@ -213,13 +215,13 @@ export const createInlineComment = async (
       }`,
       errorDetails,
       "Position:",
-      position
+      position,
     );
 
     throw new Error(
       `Failed to create inline comment: ${
         error.response?.data?.message || error.message
-      }`
+      }`,
     );
   }
 };
@@ -232,7 +234,7 @@ export const compareBranches = async (token, projectId, from, to) => {
     `/projects/${projectId}/repository/compare`,
     {
       params: { from, to, straight: true },
-    }
+    },
   );
   return data.data.diffs;
 };
@@ -244,7 +246,7 @@ export const getMRDetails = async (token, projectId, mrIid) =>
 export const getMRDiscussions = async (token, projectId, mrIid) =>
   (
     await client(token).get(
-      `/projects/${projectId}/merge_requests/${mrIid}/discussions`
+      `/projects/${projectId}/merge_requests/${mrIid}/discussions`,
     )
   ).data;
 
@@ -253,7 +255,7 @@ export const getDiffRefsWithRetry = async (
   projectId,
   iid,
   retries = 5,
-  delayMs = 1000
+  delayMs = 1000,
 ) => {
   for (let i = 0; i < retries; i++) {
     try {
@@ -268,12 +270,12 @@ export const getDiffRefsWithRetry = async (
       }
 
       console.log(
-        `Retry ${i + 1}/${retries}: diff_refs not ready for MR #${iid}`
+        `Retry ${i + 1}/${retries}: diff_refs not ready for MR #${iid}`,
       );
     } catch (error) {
       console.error(
         `Error fetching MR details on retry ${i + 1}:`,
-        error.message
+        error.message,
       );
     }
 

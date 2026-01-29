@@ -5,9 +5,10 @@
  */
 export const parseDiffLines = (diff) => {
   const result = {
-    addedLines: new Map(), // new_line -> { content, old_line_equivalent }
-    deletedLines: new Map(), // old_line -> { content }
-    canComment: new Set(), // All line numbers that can receive comments
+    addedLines: new Set(),
+    deletedLines: new Set(),
+    contextLines: new Set(),
+    canComment: new Set(),
   };
 
   if (!diff || !diff.diff) return result;
@@ -25,20 +26,20 @@ export const parseDiffLines = (diff) => {
       continue;
     }
 
-    const content = line.substring(1); // Remove prefix (+, -, or space)
-
     if (line.startsWith("-")) {
       // Deleted line
-      result.deletedLines.set(oldLine, { content });
+      result.deletedLines.add(oldLine);
       result.canComment.add(`old-${oldLine}`);
       oldLine++;
     } else if (line.startsWith("+")) {
       // Added line
-      result.addedLines.set(newLine, { content, oldLine });
+      result.addedLines.add(newLine);
       result.canComment.add(`new-${newLine}`);
       newLine++;
     } else if (line.startsWith(" ")) {
-      // Context line (unchanged) - cannot comment
+      // Context line (unchanged) - IS VALID FOR COMMENTS
+      result.contextLines.add(newLine);
+      result.canComment.add(`new-${newLine}`);
       oldLine++;
       newLine++;
     }
