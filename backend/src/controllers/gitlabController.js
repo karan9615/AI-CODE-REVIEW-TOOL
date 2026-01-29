@@ -6,6 +6,12 @@ export const getProjects = async (req, res) => {
     res.json(projects);
   } catch (error) {
     console.error("Failed to fetch projects:", error.message);
+    if (error.response?.status === 401) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "GitLab token expired or invalid",
+      });
+    }
     res.status(500).json({
       error: "Failed to fetch projects",
       message: error.message,

@@ -58,7 +58,7 @@ function AppContent() {
 
       if (projectArray.length === 0) {
         toast.warning(
-          "No projects found. Make sure you have access to GitLab projects."
+          "No projects found. Make sure you have access to GitLab projects.",
         );
       }
     } catch (e) {
@@ -102,11 +102,8 @@ function AppContent() {
     } catch (e) {
       console.error(e);
     }
-    setIsAuthenticated(false);
-    setProjects([]);
-    setProject(null);
-    setView("create");
-    setError(null);
+    // Force a hard reload to clear all state and prevent any stale session loops
+    window.location.href = "/";
   };
 
   // Show initial loading screen

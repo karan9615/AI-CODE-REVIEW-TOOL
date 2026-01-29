@@ -47,6 +47,8 @@ export const login = async (req, res) => {
  */
 export const logout = (req, res) => {
   req.session = null;
+  res.clearCookie("session");
+  res.clearCookie("session.sig"); // If using cookie-session signed
   res.json({ success: true, message: "Logged out successfully" });
 };
 
