@@ -3,7 +3,7 @@ import { GitBranch, MessageSquare, Sparkles, ExternalLink } from "lucide-react";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 
-export function MRCard({ mr, onReview, isReviewing }) {
+export function MRCard({ mr, onReview, onUpdate, isReviewing }) {
   return (
     <Card className="p-5 hover:bg-background-tertiary/30 transition-all group border-border-color/10 hover:border-primary/20">
       <div className="flex flex-col sm:flex-row gap-5 justify-between items-start sm:items-center">
@@ -19,14 +19,20 @@ export function MRCard({ mr, onReview, isReviewing }) {
             </div>
           </div>
 
-          <h4 className="text-base font-bold text-surface leading-tight hover:text-primary transition-colors cursor-pointer line-clamp-1" onClick={() => window.open(mr.web_url, '_blank', 'noopener,noreferrer')}>
+          <h4
+            className="text-base font-bold text-surface leading-tight hover:text-primary transition-colors cursor-pointer line-clamp-1"
+            onClick={() =>
+              window.open(mr.web_url, "_blank", "noopener,noreferrer")
+            }
+          >
             {mr.title}
           </h4>
 
           <div className="flex items-center gap-4 text-xs text-surface-muted font-medium">
             <div className="flex items-center gap-1.5">
               <MessageSquare size={14} className="text-surface-muted/70" />
-              {mr.user_notes_count} <span className="hidden sm:inline">comments</span>
+              {mr.user_notes_count}{" "}
+              <span className="hidden sm:inline">comments</span>
             </div>
             {mr.author && (
               <div className="flex items-center gap-1.5 text-surface-muted/70">
@@ -57,6 +63,16 @@ export function MRCard({ mr, onReview, isReviewing }) {
             className="flex-1 sm:flex-initial shadow-lg shadow-primary/10"
           >
             Review
+          </Button>
+          <Button
+            onClick={() => onUpdate && onUpdate(mr)}
+            disabled={isReviewing}
+            variant="secondary"
+            icon={Sparkles}
+            size="sm"
+            className="flex-1 sm:flex-initial"
+          >
+            Enhance
           </Button>
         </div>
       </div>

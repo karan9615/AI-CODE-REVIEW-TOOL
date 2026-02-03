@@ -8,7 +8,14 @@ export const useMergeRequest = (projectId) => {
   const [progress, setProgress] = useState([]);
 
   // Create MR
-  const createMR = async ({ sourceBranch, targetBranch, model }) => {
+  const createMR = async ({
+    sourceBranch,
+    targetBranch,
+    model,
+    assigneeId,
+    reviewerIds,
+    removeSourceBranch,
+  }) => {
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -26,7 +33,13 @@ export const useMergeRequest = (projectId) => {
       const result = await api("/mr", {
         projectId,
         model,
-        mr: { source_branch: sourceBranch, target_branch: targetBranch },
+        mr: {
+          source_branch: sourceBranch,
+          target_branch: targetBranch,
+          assignee_id: assigneeId,
+          reviewer_ids: reviewerIds,
+          remove_source_branch: removeSourceBranch,
+        },
       });
 
       if (result.error) throw new Error(result.error);
@@ -91,6 +104,46 @@ export const useMergeRequest = (projectId) => {
     }
   };
 
+  const updateMRContent = async (mrIid, model) => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    setProgress([
+      { id: 1, text: "Fetching MR diffs...", status: "active" },
+      {
+        id: 2,
+        text: "Generating improved title & description...",
+        status: "pending",
+      },
+      { id: 3, text: "Updating Merge Request...", status: "pending" },
+    ]);
+
+    try {
+      await updateProgressFake();
+
+      const result = await api(
+        "/update-content",
+        {
+          projectId,
+          mrIid,
+          model,
+        },
+        "POST",
+      );
+
+      if (result.error) throw new Error(result.error);
+      setSuccess({
+        message: "MR Title & Description updated successfully!",
+        iid: mrIid,
+        url: result.url,
+      });
+    } catch (err) {
+      setError(err.message || "Failed to update MR content");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Helper to simulate smooth progress steps (UX)
   const updateProgressFake = async () => {
     await new Promise((r) => setTimeout(r, 800));
@@ -99,9 +152,9 @@ export const useMergeRequest = (projectId) => {
         i === 0
           ? { ...s, status: "complete" }
           : i === 1
-          ? { ...s, status: "active" }
-          : s
-      )
+            ? { ...s, status: "active" }
+            : s,
+      ),
     );
     await new Promise((r) => setTimeout(r, 1500));
     setProgress((p) =>
@@ -109,9 +162,9 @@ export const useMergeRequest = (projectId) => {
         i <= 1
           ? { ...s, status: "complete" }
           : i === 2
-          ? { ...s, status: "active" }
-          : s
-      )
+            ? { ...s, status: "active" }
+            : s,
+      ),
     );
   };
 
@@ -122,6 +175,7 @@ export const useMergeRequest = (projectId) => {
     progress,
     createMR,
     reviewMR,
+    updateMRContent,
     resetState: () => {
       setError(null);
       setSuccess(null);

@@ -64,16 +64,34 @@
     right: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle at 80% 20%, rgba(124, 58, 237, 0.03) 0%, transparent 40%),
-      radial-gradient(circle at 20% 80%, rgba(8, 145, 178, 0.03) 0%, transparent 40%);
+    background:
+      radial-gradient(
+        circle at 80% 20%,
+        rgba(124, 58, 237, 0.03) 0%,
+        transparent 40%
+      ),
+      radial-gradient(
+        circle at 20% 80%,
+        rgba(8, 145, 178, 0.03) 0%,
+        transparent 40%
+      );
     pointer-events: none;
     z-index: -1;
   }
 
   /* Dark mode override for background mesh */
   .dark body::before {
-    background: radial-gradient(circle at 80% 20%, rgba(124, 58, 237, 0.08) 0%, transparent 50%),
-      radial-gradient(circle at 0% 50%, rgba(8, 145, 178, 0.05) 0%, transparent 50%);
+    background:
+      radial-gradient(
+        circle at 80% 20%,
+        rgba(124, 58, 237, 0.08) 0%,
+        transparent 50%
+      ),
+      radial-gradient(
+        circle at 0% 50%,
+        rgba(8, 145, 178, 0.05) 0%,
+        transparent 50%
+      );
   }
 }
 
@@ -90,8 +108,7 @@
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.02),
     0 10px 40px -10px rgba(124, 58, 237, 0.05),
-    /* Violet tint */
-    0 0 0 1px rgba(226, 232, 240, 0.6);
+    /* Violet tint */ 0 0 0 1px rgba(226, 232, 240, 0.6);
   /* Crisp border */
   border: none;
   /* Handled by box-shadow ring for crispness */

@@ -2,7 +2,13 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
-export function Modal({ isOpen, onClose, title, children, maxWidth = "max-w-lg" }) {
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  maxWidth = "max-w-lg",
+}) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -21,7 +27,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = "max-w-lg" 
             initial={{ opacity: 0, scale: 0.95, y: "-50%", x: "-50%" }}
             animate={{ opacity: 1, scale: 1, y: "-50%", x: "-50%" }}
             exit={{ opacity: 0, scale: 0.95, y: "-50%", x: "-50%" }}
-            className={`fixed top-1/2 left-1/2 w-[90%] ${maxWidth} glass-panel rounded-2xl shadow-2xl z-50 overflow-hidden border border-border-color/10 outline-none`}
+            className={`fixed top-1/2 left-1/2 w-[90%] ${maxWidth} glass-panel rounded-2xl shadow-2xl z-50 border border-border-color/10 outline-none`}
             role="dialog"
             aria-modal="true"
           >
@@ -37,7 +43,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = "max-w-lg" 
             </div>
 
             {/* Body */}
-            <div className="p-6 max-h-[80vh] overflow-y-auto w-full">
+            <div className="p-6 max-h-[80vh] overflow-visible w-full">
               {children}
             </div>
           </motion.div>

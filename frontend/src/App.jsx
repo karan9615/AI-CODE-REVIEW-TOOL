@@ -19,6 +19,11 @@ function AppContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [search, setSearch] = useState("");
+
   // Check session on mount
   useEffect(() => {
     checkSession();
@@ -44,19 +49,35 @@ function AppContent() {
   // Load projects when authenticated
   useEffect(() => {
     if (isAuthenticated && projects.length === 0) {
-      loadProjects();
+      loadProjects(1, "", true);
     }
   }, [isAuthenticated]);
 
-  const loadProjects = async () => {
+  const loadProjects = async (pageNum = 1, searchQuery = "", reset = false) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await api("/projects", {}, "GET");
-      const projectArray = Array.isArray(data) ? data : [];
-      setProjects(projectArray);
+      const data = await api(
+        "/projects",
+        { page: pageNum, per_page: 20, search: searchQuery },
+        "GET",
+      );
 
-      if (projectArray.length === 0) {
+      // Backend now returns { data: [], pagination: {} }
+      const newProjects = data.data || [];
+      const pagination = data.pagination;
+
+      if (reset) {
+        setProjects(newProjects);
+      } else {
+        setProjects((prev) => [...prev, ...newProjects]);
+      }
+
+      setHasMore(!!pagination.nextPage);
+      setPage(pageNum);
+      setSearch(searchQuery);
+
+      if (newProjects.length === 0 && pageNum === 1 && !searchQuery) {
         toast.warning(
           "No projects found. Make sure you have access to GitLab projects.",
         );
@@ -72,6 +93,17 @@ function AppContent() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearch = (query) => {
+    // Debounce is handled in UI or here? Using simple fetch for now
+    loadProjects(1, query, true);
+  };
+
+  const handleLoadMore = () => {
+    if (!loading && hasMore) {
+      loadProjects(page + 1, search, false);
     }
   };
 
@@ -127,14 +159,21 @@ function AppContent() {
           error={error}
           setProject={setProject}
           logout={handleLogout}
-          onRetry={loadProjects}
+          onRetry={() => loadProjects(1, search, true)}
+          onSearch={handleSearch}
+          onLoadMore={handleLoadMore}
+          hasMore={hasMore}
         />
       ) : (
         <MainApp
           project={project}
           view={view}
           setView={setView}
-          onBack={() => setProject(null)}
+          onBack={() => {
+            setProject(null);
+            // Reset to full list when going back
+            loadProjects(1, "", true);
+          }}
           logout={handleLogout}
         />
       )}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Header } from "../common/Header";
 import { ProjectCard } from "./ProjectCard";
 import { Search, RefreshCw, AlertCircle } from "lucide-react";
@@ -14,16 +14,42 @@ export function ProjectSelector({
   setProject,
   logout,
   onRetry,
+  onSearch,
+  onLoadMore,
+  hasMore,
 }) {
-  const [search, setSearch] = useState("");
+  const [searchValue, setSearchValue] = useState("");
+  const observerTarget = React.useRef(null);
 
-  const filtered = React.useMemo(() => {
-    return projects.filter(
-      (p) =>
-        p.name?.toLowerCase().includes(search.toLowerCase()) ||
-        p.path_with_namespace?.toLowerCase().includes(search.toLowerCase()),
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (onSearch) onSearch(searchValue);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          if (onLoadMore) onLoadMore();
+        }
+      },
+      { threshold: 1.0 },
     );
-  }, [projects, search]);
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [hasMore, loading, onLoadMore]);
 
   return (
     <div className="min-h-screen bg-background pb-12 transition-colors duration-300">
@@ -57,10 +83,7 @@ export function ProjectSelector({
           >
             <Alert type="error">
               <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle size={20} />
-                  <span>{error}</span>
-                </div>
+                <span>{error}</span>
                 <Button
                   onClick={onRetry}
                   disabled={loading}
@@ -75,74 +98,97 @@ export function ProjectSelector({
           </motion.div>
         )}
 
-        {/* Loading State */}
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <Loader size="lg" text="Loading projects..." />
+        {/* Search Bar */}
+        <div className="mb-10 relative max-w-xl z-10">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-muted">
+            <Search size={20} />
           </div>
-        ) : (
-          <>
-            {/* Search Bar */}
-            <div className="mb-10 relative max-w-xl z-10">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-muted">
-                <Search size={20} />
-              </div>
-              <input
-                className="w-full pl-12 pr-4 py-4 bg-background-secondary/50 border border-border-color/10 rounded-2xl shadow-lg focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all outline-none text-surface placeholder:text-surface-muted/50 backdrop-blur-md"
-                placeholder="Search projects by name..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+          <input
+            className="w-full pl-12 pr-4 py-4 bg-background-secondary/50 border border-border-color/10 rounded-2xl shadow-lg focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all outline-none text-surface placeholder:text-surface-muted/50 backdrop-blur-md"
+            placeholder="Search projects by name..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+          />
+        </div>
+
+        {/* Projects Grid */}
+        {projects.length === 0 && !loading ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center py-24 px-4 rounded-3xl border border-dashed border-border-color/30 bg-background-secondary/30 backdrop-blur-sm max-w-2xl mx-auto mt-10"
+          >
+            <div className="w-24 h-24 mb-6 bg-gradient-to-tr from-background-tertiary to-background-secondary rounded-full flex items-center justify-center shadow-lg shadow-black/5 ring-1 ring-white/10 group">
+              <Search
+                size={40}
+                className="text-surface-muted/50 group-hover:text-primary/50 transition-colors duration-500"
               />
             </div>
-
-            {/* Projects Grid */}
-            {projects.length === 0 && !loading ? (
-              <div className="text-center py-20">
-                <div className="w-20 h-20 mx-auto mb-6 bg-surface-muted/10 rounded-full flex items-center justify-center">
-                  <Search size={32} className="text-surface-muted/50" />
-                </div>
-                <h3 className="text-xl font-semibold text-surface mb-2">
-                  No Projects Found
-                </h3>
-                <p className="text-surface-muted mb-6">
-                  You don't have access to any GitLab projects with sufficient
-                  permissions.
-                </p>
-                <Button onClick={onRetry} disabled={loading} icon={RefreshCw}>
-                  Refresh
-                </Button>
-              </div>
-            ) : (
-              <>
+            <h3 className="text-2xl font-bold text-surface mb-3 tracking-tight">
+              No Projects Found
+            </h3>
+            <p className="text-surface-muted mb-8 text-center max-w-sm leading-relaxed">
+              {searchValue ? (
+                <span>
+                  We couldn't find any projects matching{" "}
+                  <strong className="text-surface">"{searchValue}"</strong>. Try
+                  a different term.
+                </span>
+              ) : (
+                "You don't have access to any GitLab projects with sufficient permissions."
+              )}
+            </p>
+            <Button
+              onClick={onRetry}
+              disabled={loading}
+              icon={RefreshCw}
+              size="lg"
+              className="shadow-xl shadow-primary/20"
+            >
+              Refresh Projects
+            </Button>
+          </motion.div>
+        ) : (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10"
+            >
+              {projects.map((p, index) => (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10"
+                  key={p.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.05 }}
                 >
-                  {filtered.map((p, index) => (
-                    <motion.div
-                      key={p.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: Math.min(index, 20) * 0.05 }}
-                    >
-                      <ProjectCard project={p} onClick={() => setProject(p)} />
-                    </motion.div>
-                  ))}
+                  <ProjectCard project={p} onClick={() => setProject(p)} />
                 </motion.div>
+              ))}
+            </motion.div>
 
-                {filtered.length === 0 && search && (
-                  <div className="text-center py-20 text-surface-muted">
-                    <Search size={48} className="mx-auto mb-4 opacity-30" />
-                    <p className="text-lg">
-                      No projects found matching "{search}"
-                    </p>
-                    <p className="text-sm mt-2">Try a different search term</p>
-                  </div>
-                )}
-              </>
-            )}
+            {/* Loading / Sentinel */}
+            <div
+              ref={observerTarget}
+              className="h-20 flex items-center justify-center w-full mt-8"
+            >
+              {loading && (
+                <Loader
+                  size="md"
+                  text={
+                    projects.length === 0
+                      ? "Loading projects..."
+                      : "Loading more projects..."
+                  }
+                />
+              )}
+              {!hasMore && projects.length > 0 && (
+                <p className="text-surface-muted/50 text-sm">
+                  No more projects
+                </p>
+              )}
+            </div>
           </>
         )}
 

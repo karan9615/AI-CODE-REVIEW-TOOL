@@ -120,3 +120,28 @@ export const reviewMR = async (req, res) => {
     });
   }
 };
+
+export const updateMRContent = async (req, res) => {
+  try {
+    const { projectId, mrIid, model } = req.body;
+    const token = req.token;
+
+    const customApiKey = req.session?.apiKey || req.headers["x-ai-api-key"];
+
+    const result = await mrService.updateMRContent(
+      token,
+      projectId,
+      mrIid,
+      model,
+      customApiKey,
+    );
+
+    res.json(result);
+  } catch (e) {
+    console.error("MR update failed:", e.message);
+    res.status(500).json({
+      error: e.message,
+      details: e.response?.data,
+    });
+  }
+};

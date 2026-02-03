@@ -2,8 +2,13 @@ import * as gl from "../gitlab/gitlabService.js";
 
 export const getProjects = async (req, res) => {
   try {
-    const projects = await gl.getProjects(req.token);
-    res.json(projects);
+    const { page, per_page, search } = req.query;
+    const result = await gl.getProjects(req.token, {
+      page,
+      perPage: per_page,
+      search,
+    });
+    res.json(result);
   } catch (error) {
     console.error("Failed to fetch projects:", error.message);
     if (error.response?.status === 401) {
@@ -22,18 +27,40 @@ export const getProjects = async (req, res) => {
 export const getBranches = async (req, res) => {
   try {
     const { projectId } = req.body;
+    const { page, search } = req.query;
     const token = req.token;
 
     if (!projectId) {
       return res.status(400).json({ error: "projectId is required" });
     }
 
-    const branches = await gl.getBranches(token, projectId);
-    res.json(branches);
+    const result = await gl.getBranches(token, projectId, { page, search });
+    res.json(result);
   } catch (error) {
     console.error("Failed to fetch branches:", error.message);
     res.status(500).json({
       error: "Failed to fetch branches",
+      message: error.message,
+    });
+  }
+};
+
+export const getProjectMembers = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { search } = req.query;
+    const token = req.token;
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+
+    const members = await gl.getProjectMembers(token, projectId, search);
+    res.json(members);
+  } catch (error) {
+    console.error("Failed to fetch project members:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch project members",
       message: error.message,
     });
   }

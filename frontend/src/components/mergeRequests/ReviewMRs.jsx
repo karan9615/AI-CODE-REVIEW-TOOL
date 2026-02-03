@@ -21,15 +21,26 @@ export function ReviewMRs({ project }) {
   const [reviewingIid, setReviewingIid] = useState(null);
 
   const [showModelModal, setShowModelModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [selectedMR, setSelectedMR] = useState(null);
-  const [selectedModel, setSelectedModel] = useState("chatgpt");
+  const [selectedModel, setSelectedModel] = useState("");
+
+  const [actionType, setActionType] = useState("review");
 
   // Custom Hook
-  const { loading: reviewLoading, error: reviewError, success: reviewSuccess, progress, reviewMR, resetState } = useMergeRequest(project.id);
+  const {
+    loading: reviewLoading,
+    error: reviewError,
+    success: reviewSuccess,
+    progress,
+    reviewMR,
+    updateMRContent,
+    resetState,
+  } = useMergeRequest(project.id);
 
   // Get models from context
   const { models: modelOptions } = useModels();
-  
+
   // Combine errors
   const error = listError || reviewError;
 
@@ -57,17 +68,39 @@ export function ReviewMRs({ project }) {
     resetState();
   };
 
+  const handleUpdateClick = (mr) => {
+    setSelectedMR(mr);
+    setShowUpdateModal(true);
+    resetState();
+  };
+
   const startReview = async () => {
     if (!selectedMR) return;
 
     setShowModelModal(false);
     setReviewingIid(selectedMR.iid);
+    setActionType("review");
     resetState();
 
     try {
       await reviewMR(selectedMR.iid, selectedModel);
     } catch (err) {
       // Handled by hook
+    } finally {
+      setReviewingIid(null);
+    }
+  };
+
+  const startUpdate = async () => {
+    if (!selectedMR) return;
+    setShowUpdateModal(false);
+    setReviewingIid(selectedMR.iid);
+    setActionType("update");
+    resetState();
+
+    try {
+      await updateMRContent(selectedMR.iid, selectedModel);
+    } catch (e) {
     } finally {
       setReviewingIid(null);
     }
@@ -90,20 +123,38 @@ export function ReviewMRs({ project }) {
         {/* Header Section */}
         <div className="relative p-6 sm:p-8 border-b border-border-color/10 bg-background-secondary/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-accent-cyan/10 flex items-center justify-center text-accent-cyan shadow-inner">
-              <FileCode size={24} />
+            <div
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-colors duration-300 ${
+                reviewingIid
+                  ? "bg-primary/10 text-primary"
+                  : "bg-accent-cyan/10 text-accent-cyan"
+              }`}
+            >
+              {reviewingIid ? <Sparkles size={24} /> : <FileCode size={24} />}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-surface">Merge Requests</h3>
-              <p className="text-surface-muted text-sm">Select an MR to review with AI</p>
+              <h3 className="text-xl font-bold text-surface transition-all duration-300">
+                {reviewingIid
+                  ? actionType === "review"
+                    ? "Code Review"
+                    : "Enhance MR Details"
+                  : "Merge Requests"}
+              </h3>
+              <p className="text-surface-muted text-sm transition-all duration-300">
+                {reviewingIid
+                  ? actionType === "review"
+                    ? "Analyzing code changes and generating comments..."
+                    : "Optimizing title and description..."
+                  : "Select an MR to review or enhance with AI"}
+              </p>
             </div>
           </div>
           <Button
             onClick={loadMRs}
-            disabled={loadingMrs}
+            disabled={loadingMrs || reviewingIid}
             variant="secondary"
             size="sm"
-            className="shrink-0 rounded-full px-4 font-medium text-sm gap-2 hover:bg-surface-muted/20"
+            className={`shrink-0 rounded-full px-4 font-medium text-sm gap-2 hover:bg-surface-muted/20 ${reviewingIid ? "opacity-0 pointer-events-none" : "opacity-100"}`}
             icon={RefreshCw}
           >
             Refresh
@@ -117,7 +168,7 @@ export function ReviewMRs({ project }) {
               <motion.div
                 key="reviewing"
                 initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
+                animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 className="flex flex-col items-center justify-center py-16 px-8"
               >
@@ -131,11 +182,19 @@ export function ReviewMRs({ project }) {
                       <motion.div
                         className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/20 to-transparent"
                         animate={{ x: ["-100%", "100%"] }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
                       />
                       <Sparkles size={32} />
                     </div>
-                    <h3 className="text-xl font-bold text-surface">AI Review in Progress</h3>
+                    <h3 className="text-xl font-bold text-surface">
+                      {actionType === "review"
+                        ? "AI Review in Progress"
+                        : "AI Enhancement in Progress"}
+                    </h3>
                   </motion.div>
 
                   <ProgressSteps steps={progress} />
@@ -156,12 +215,21 @@ export function ReviewMRs({ project }) {
 
                 {reviewSuccess && (
                   <div className="p-8 pb-0">
-                    <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+                    <motion.div
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
                       <Alert type="success">
                         <div className="flex flex-col gap-1">
-                          <span className="font-bold">Review Complete for MR #{reviewSuccess.iid}</span>
+                          <span className="font-bold">
+                            {actionType === "review"
+                              ? `Review Complete for MR #${reviewSuccess.iid}`
+                              : `Enhancement Complete for MR #${reviewSuccess.iid}`}
+                          </span>
                           <span className="text-sm opacity-90">
-                            {reviewSuccess.comments?.posted} comments posted successfully.
+                            {actionType === "review"
+                              ? `${reviewSuccess.comments?.posted} comments posted successfully.`
+                              : "Title & Description have been updated."}
                           </span>
                         </div>
                       </Alert>
@@ -180,9 +248,12 @@ export function ReviewMRs({ project }) {
                       <div className="w-16 h-16 mx-auto bg-surface-muted/10 rounded-full flex items-center justify-center text-surface-muted mb-4">
                         <FileCode size={32} opacity={0.5} />
                       </div>
-                      <h3 className="text-lg font-semibold text-surface mb-2">No Open Merge Requests</h3>
+                      <h3 className="text-lg font-semibold text-surface mb-2">
+                        No Open Merge Requests
+                      </h3>
                       <p className="text-sm text-surface-muted max-w-xs mx-auto">
-                        There are no open merge requests in this project. Create one to get started!
+                        There are no open merge requests in this project. Create
+                        one to get started!
                       </p>
                     </div>
                   ) : (
@@ -192,6 +263,7 @@ export function ReviewMRs({ project }) {
                           key={mr.iid}
                           mr={mr}
                           onReview={handleReviewClick}
+                          onUpdate={handleUpdateClick}
                           isReviewing={reviewingIid === mr.iid}
                         />
                       ))}
@@ -202,7 +274,6 @@ export function ReviewMRs({ project }) {
             )}
           </AnimatePresence>
         </CardContent>
-
       </Card>
 
       {/* Model Selection Modal */}
@@ -216,7 +287,9 @@ export function ReviewMRs({ project }) {
             #{selectedMR?.iid}
           </div>
           <div>
-            <div className="font-semibold text-surface mb-1 line-clamp-1">{selectedMR?.title}</div>
+            <div className="font-semibold text-surface mb-1 line-clamp-1">
+              {selectedMR?.title}
+            </div>
             <div className="text-xs text-surface-muted font-mono">
               {selectedMR?.source_branch} → {selectedMR?.target_branch}
             </div>
@@ -234,11 +307,61 @@ export function ReviewMRs({ project }) {
         </div>
 
         <div className="flex gap-3">
-          <Button variant="ghost" onClick={() => setShowModelModal(false)} className="flex-1">
+          <Button
+            variant="ghost"
+            onClick={() => setShowModelModal(false)}
+            className="flex-1"
+          >
             Cancel
           </Button>
-          <Button onClick={startReview} className="flex-1" icon={Sparkles}>
+          <Button
+            onClick={startReview}
+            className="flex-1"
+            icon={Sparkles}
+            disabled={!selectedModel}
+            title={!selectedModel ? "Please select an AI model" : ""}
+          >
             Start AI Review
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Update MR Modal */}
+      <Modal
+        isOpen={showUpdateModal}
+        onClose={() => setShowUpdateModal(false)}
+        title="Enhance MR Details"
+      >
+        <div className="mb-6 text-sm text-surface-muted">
+          This will use AI to analyze the diffs and <strong>overwrite</strong>{" "}
+          the current title and description of the merge request.
+        </div>
+
+        <div className="mb-8">
+          <Select
+            label="Choose AI Model"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            options={modelOptions}
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            variant="ghost"
+            onClick={() => setShowUpdateModal(false)}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={startUpdate}
+            className="flex-1"
+            icon={Sparkles}
+            disabled={!selectedModel}
+            title={!selectedModel ? "Please select an AI model" : ""}
+          >
+            Enhance Content
           </Button>
         </div>
       </Modal>

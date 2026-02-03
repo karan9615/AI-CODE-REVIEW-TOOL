@@ -42,7 +42,13 @@ export const mrService = {
     token,
     projectId,
     model,
-    { source_branch, target_branch },
+    {
+      source_branch,
+      target_branch,
+      assignee_id,
+      reviewer_ids,
+      remove_source_branch,
+    },
     apiKey = null,
   ) {
     logger.info(`Creating MR: ${source_branch} -> ${target_branch}`);
@@ -75,6 +81,9 @@ export const mrService = {
       target_branch,
       title,
       description,
+      assignee_id,
+      reviewer_ids,
+      remove_source_branch,
     });
 
     logger.info(`Created MR #${created.iid}`);
@@ -153,6 +162,35 @@ export const mrService = {
       web_url: created.web_url,
       comments: result,
     };
+  },
+
+  async updateMRContent(token, projectId, mrIid, model, apiKey = null) {
+    logger.info(`Updating content for MR !${mrIid}`);
+
+    // Get MR diffs
+    // Note: getDiffs returns an array of diff objects
+    const diffs = await gl.getDiffs(token, projectId, mrIid);
+
+    if (!diffs || diffs.length === 0) {
+      throw new Error("No changes found in this merge request");
+    }
+
+    // Generate new content
+    const { title, description } = await generateMRContent(
+      model,
+      diffs,
+      apiKey,
+    );
+
+    logger.info(`Generated new title: ${title}`);
+
+    // Update MR
+    const updated = await gl.updateMR(token, projectId, mrIid, {
+      title,
+      description,
+    });
+
+    return updated.data;
   },
 
   /**

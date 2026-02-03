@@ -58,7 +58,7 @@ export const api = async (path, body = {}, method = "POST") => {
       method: method.toLowerCase(),
       url: path,
       data: method !== "GET" ? body : undefined,
-      params: method !== "GET" ? body : undefined,
+      params: method === "GET" ? body : undefined,
       headers: {},
     });
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { GitBranch, Sparkles, ArrowRight as ArrowIcon } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { api } from "../../utils/api";
 import { Alert } from "../common/Alert";
 import { ProgressSteps } from "../common/ProgressSteps";
@@ -7,66 +7,87 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
+import { SearchableSelect } from "../ui/SearchableSelect";
 import { useModels } from "../../contexts/ModelsContext";
 
 import { useMergeRequest } from "../../hooks/useMergeRequest";
 
 export function CreateMR({ project }) {
-  const [branches, setBranches] = useState([]);
   const [src, setSrc] = useState("");
   const [tgt, setTgt] = useState("");
-  const [model, setModel] = useState("chatgpt");
-  const [loadingBranches, setLoadingBranches] = useState(true);
-  const [branchError, setBranchError] = useState(null);
+  const [assignee, setAssignee] = useState("");
+  const [reviewers, setReviewers] = useState([]);
+  const [removeSourceBranch, setRemoveSourceBranch] = useState(false);
+
+  const [model, setModel] = useState("");
 
   // Use Custom Hook
-  const { loading, error: mrError, success, progress, createMR, resetState } = useMergeRequest(project.id);
-  
-  // Combine errors for display
-  const error = mrError || branchError;
+  const {
+    loading,
+    error: mrError,
+    success,
+    progress,
+    createMR,
+    resetState,
+  } = useMergeRequest(project.id);
 
   const { models: modelOptions } = useModels();
 
-  useEffect(() => {
-    loadBranches();
-  }, []);
-
-  const loadBranches = async () => {
-    setLoadingBranches(true);
-    setBranchError(null);
+  const fetchBranches = async (query, page) => {
     try {
-      const data = await api("/branches", { projectId: project.id });
-      if (data.error) throw new Error(data.error);
-      setBranches(data);
-    } catch (err) {
-      setBranchError("Failed to load branches: " + err.message);
-    } finally {
-      setLoadingBranches(false);
+      const res = await api(
+        `/branches?page=${page}&search=${query}`,
+        { projectId: project.id },
+        "POST",
+      );
+      return {
+        options: res.data.map((b) => ({ label: b.name, value: b.name })),
+        hasMore: !!res.pagination?.nextPage,
+      };
+    } catch (e) {
+      console.error(e);
+      return { options: [], hasMore: false };
     }
   };
 
-  const create = async () => {
-    if (!src || !tgt) return setBranchError("Please select both source and target branches");
-    if (src === tgt) return setBranchError("Source and target branches must be different");
-    
-    setBranchError(null);
-    
+  const fetchMembers = async (query, page) => {
     try {
-      await createMR({ sourceBranch: src, targetBranch: tgt, model });
-      // Reset form on success
+      // Note: Project Members API in service doesn't return pagination meta yet, assuming simplified list or need update
+      const res = await api(
+        `/projects/${project.id}/members?search=${query}`,
+        {},
+        "GET",
+      );
+      // res is array
+      return {
+        options: res.map((u) => ({ label: u.name, value: u.id })),
+        hasMore: res.length === 20, // heuristic
+      };
+    } catch (e) {
+      return { options: [], hasMore: false };
+    }
+  };
+
+  const handleCreate = async () => {
+    try {
+      if (!src || !tgt) return;
+      await createMR({
+        sourceBranch: src,
+        targetBranch: tgt,
+        model,
+        assigneeId: assignee,
+        reviewerIds: reviewers.length ? reviewers : undefined,
+        removeSourceBranch,
+      });
+
       setSrc("");
       setTgt("");
-    } catch(e) {
-      // Error handled by hook
-    }
+    } catch (e) {}
   };
-
-  const branchOptions = branches.map((b) => ({ label: b.name, value: b.name }));
 
   return (
     <div className="w-full max-w-3xl mx-auto">
       <Card className="overflow-hidden border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl">
-        {/* Decorative Grid Background */}
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light"></div>
 
         {/* Header Section */}
@@ -76,14 +97,17 @@ export function CreateMR({ project }) {
               <Sparkles size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-surface">New Merge Request</h2>
-              <p className="text-surface-muted text-sm">Select branches to analyze and merge</p>
+              <h2 className="text-xl font-bold text-surface">
+                New Merge Request
+              </h2>
+              <p className="text-surface-muted text-sm">
+                Select branches to analyze and merge
+              </p>
             </div>
           </div>
         </div>
 
         <CardContent className="p-0 relative min-h-[400px]">
-          {/* Main Content Area */}
           <div className="p-8 sm:p-10 relative z-10">
             <AnimatePresence mode="wait">
               {loading ? (
@@ -94,25 +118,7 @@ export function CreateMR({ project }) {
                   exit={{ opacity: 0, scale: 1.05 }}
                   className="flex flex-col items-center justify-center py-8"
                 >
-                  <div className="w-full max-w-sm mx-auto flex flex-col items-center">
-                    <motion.div
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      className="mb-8 flex flex-col items-center gap-4"
-                    >
-                      <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-lg shadow-primary/20 relative overflow-hidden">
-                        <motion.div
-                          className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/20 to-transparent"
-                          animate={{ x: ["-100%", "100%"] }}
-                          transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                        />
-                        <Sparkles size={32} />
-                      </div>
-                      <h3 className="text-xl font-bold text-surface">Processing Request</h3>
-                    </motion.div>
-
-                    <ProgressSteps steps={progress} />
-                  </div>
+                  <ProgressSteps steps={progress} />
                 </motion.div>
               ) : success ? (
                 <motion.div
@@ -121,58 +127,22 @@ export function CreateMR({ project }) {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex flex-col items-center justify-center py-8 text-center"
                 >
-                  <div className="w-20 h-20 bg-accent-cyan/10 rounded-full flex items-center justify-center text-accent-cyan mb-6 shadow-[0_0_30px_rgba(34,211,238,0.2)]">
+                  <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center text-green-500 mb-6">
                     <Sparkles size={40} />
                   </div>
-                  <h3 className="text-2xl font-bold text-surface mb-2">{success.message}</h3>
-                  <p className="text-surface-muted mb-8 max-w-md">
-                    MR #{success.iid} has been created and reviewed.
-                  </p>
-
-                  <div className="flex flex-col sm:flex-row gap-4 mt-2">
-                    <Button
-                      href={success.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-w-[160px] shadow-lg shadow-primary/20"
-                    >
-                      View in GitLab
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={resetState}
-                      className="min-w-[140px]"
-                    >
-                      Create Another
-                    </Button>
-                  </div>
-
-                  {success.comments && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className={`mt-10 p-4 rounded-xl border flex items-center gap-3 text-sm ${success.comments.posted === 0
-                        ? "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400"
-                        : "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
-                        }`}
-                    >
-                      {success.comments.posted === 0 ? (
-                        <div className="p-1 rounded-full bg-green-500/20"><Sparkles size={14} /></div>
-                      ) : (
-                        <div className="p-1 rounded-full bg-blue-500/20"><Sparkles size={14} /></div>
-                      )}
-
-                      <div className="flex flex-col items-start text-left">
-                        <span className="font-semibold">AI Review Completed</span>
-                        <span className="opacity-90">
-                          {success.comments.posted === 0
-                            ? "No issues found. Code looks good!"
-                            : `${success.comments.posted} comments posted for review.`}
-                        </span>
-                      </div>
-                    </motion.div>
-                  )}
+                  <h3 className="text-2xl font-bold text-surface mb-2">
+                    {success.message || "Operation Successful"}
+                  </h3>
+                  <Button
+                    href={success.web_url || success.url}
+                    target="_blank"
+                    className="mt-6"
+                  >
+                    View in GitLab
+                  </Button>
+                  <Button variant="ghost" onClick={resetState} className="mt-2">
+                    Back to Form
+                  </Button>
                 </motion.div>
               ) : (
                 <motion.div
@@ -182,50 +152,105 @@ export function CreateMR({ project }) {
                   exit={{ opacity: 0 }}
                   className="space-y-8"
                 >
-                  {error && (
-                    <Alert type="error">{error}</Alert>
-                  )}
+                  {mrError && <Alert type="error">{mrError}</Alert>}
 
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] gap-4 items-end">
-                    <Select
-                      label="Source"
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <SearchableSelect
+                      label="Source Branch"
                       value={src}
-                      onChange={(e) => setSrc(e.target.value)}
-                      options={branchOptions}
-                      placeholder={loadingBranches ? "Loading..." : "Select source"}
-                      disabled={loadingBranches}
-                      className="w-full"
+                      onChange={setSrc}
+                      loadOptions={fetchBranches}
+                      placeholder="Select source..."
+                      required
                     />
-
-                    <div className="hidden md:flex items-center justify-center pb-3 text-surface-muted/30">
-                      <ArrowIcon size={24} />
-                    </div>
-
-                    <Select
-                      label="Target"
+                    <SearchableSelect
+                      label="Target Branch"
                       value={tgt}
-                      onChange={(e) => setTgt(e.target.value)}
-                      options={branchOptions}
-                      placeholder={loadingBranches ? "Loading..." : "Select target"}
-                      disabled={loadingBranches}
-                      className="w-full"
+                      onChange={setTgt}
+                      loadOptions={fetchBranches}
+                      placeholder="Select target..."
+                      required
                     />
                   </div>
 
-                  {/* Visual Connection Line */}
-                  {src && tgt && (
-                    <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2 text-primary">
-                        <GitBranch size={16} />
-                        <span className="font-mono font-bold">{src}</span>
-                      </div>
-                      <div className="h-[1px] flex-1 bg-gradient-to-r from-primary/20 via-primary/50 to-primary/20 mx-4"></div>
-                      <div className="flex items-center gap-2 text-surface-muted">
-                        <GitBranch size={16} />
-                        <span className="font-mono font-bold">{tgt}</span>
-                      </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <SearchableSelect
+                      label="Assignee (Optional)"
+                      value={assignee}
+                      onChange={setAssignee}
+                      loadOptions={fetchMembers}
+                      placeholder="Search users..."
+                    />
+                    <SearchableSelect
+                      label="Reviewer (Optional)"
+                      value={reviewers[0]} // Single reviewer for now
+                      onChange={(val) => setReviewers(val ? [val] : [])}
+                      loadOptions={fetchMembers}
+                      placeholder="Search users..."
+                    />
+                  </div>
+
+                  <div
+                    onClick={() => setRemoveSourceBranch(!removeSourceBranch)}
+                    className={`input-field flex items-center gap-4 cursor-pointer group relative overflow-hidden h-auto
+                      ${
+                        removeSourceBranch
+                          ? "ring-2 ring-primary/50 border-primary/50 bg-primary/5"
+                          : "hover:border-primary/50"
+                      }
+                    `}
+                  >
+                    <div
+                      className={`relative flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all duration-200 z-10 shrink-0
+                        ${
+                          removeSourceBranch
+                            ? "bg-primary border-primary text-white scale-100"
+                            : "bg-transparent border-surface-muted/30 text-transparent group-hover:border-primary/50"
+                        }
+                      `}
+                    >
+                      <motion.div
+                        initial={false}
+                        animate={{
+                          scale: removeSourceBranch ? 1 : 0.5,
+                          opacity: removeSourceBranch ? 1 : 0,
+                        }}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </motion.div>
                     </div>
-                  )}
+                    <div className="flex flex-col z-10">
+                      <span
+                        className={`text-sm font-semibold transition-colors ${removeSourceBranch ? "text-primary" : "text-surface"}`}
+                      >
+                        Delete source branch
+                      </span>
+                      <span className="text-xs text-surface-muted">
+                        Automatically delete the source branch after merging
+                      </span>
+                    </div>
+
+                    {/* Subtle active background fill animation */}
+                    {removeSourceBranch && (
+                      <motion.div
+                        layoutId="active-bg"
+                        className="absolute inset-0 bg-primary/5 z-0"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      />
+                    )}
+                  </div>
 
                   <div className="pt-4 border-t border-border-color/5">
                     <Select
@@ -237,16 +262,15 @@ export function CreateMR({ project }) {
                     />
                   </div>
 
-                  <div className="pt-2">
-                    <Button
-                      className="w-full h-14 text-lg shadow-primary/25 shadow-xl"
-                      onClick={create}
-                      disabled={loadingBranches || !src || !tgt}
-                      icon={Sparkles}
-                    >
-                      Process Merge Request
-                    </Button>
-                  </div>
+                  <Button
+                    className="w-full h-14 text-lg shadow-primary/25 shadow-xl"
+                    onClick={handleCreate}
+                    disabled={!src || !tgt || !model}
+                    title={!model ? "Please select an AI model" : ""}
+                    icon={Sparkles}
+                  >
+                    Create Merge Request
+                  </Button>
                 </motion.div>
               )}
             </AnimatePresence>

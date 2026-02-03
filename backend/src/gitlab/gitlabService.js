@@ -1,43 +1,70 @@
 import { client } from "./gitlabClient.js";
 import { parseDiffLines } from "../utils/diffUtils.js";
 
-export const getProjects = async (token) => {
+export const getProjects = async (token, options = {}) => {
+  const { page = 1, perPage = 20, search = "" } = options;
   const api = client(token);
-  let allProjects = [];
-  let page = 1;
-  let hasMore = true;
 
-  while (hasMore) {
-    const response = await api.get("/projects", {
-      params: {
-        membership: true,
-        archived: false,
-        order_by: "updated_at",
-        sort: "desc",
-        per_page: 100,
-        page,
-      },
-    });
+  const response = await api.get("/projects", {
+    params: {
+      membership: true,
+      archived: false,
+      order_by: "updated_at",
+      sort: "desc",
+      per_page: perPage,
+      page,
+      search,
+    },
+  });
 
-    allProjects = allProjects.concat(response.data);
-
-    const nextPage = response.headers["x-next-page"];
-    if (nextPage) {
-      page = nextPage;
-    } else {
-      hasMore = false;
-    }
-  }
-
-  return allProjects;
+  return {
+    data: response.data,
+    pagination: {
+      nextPage: response.headers["x-next-page"],
+      total: response.headers["x-total"],
+      totalPages: response.headers["x-total-pages"],
+    },
+  };
 };
 
-export const getBranches = async (token, projectId) =>
-  (
-    await client(token).get(
-      `/projects/${projectId}/repository/branches?per_page=100&sort=updated_desc`,
-    )
-  ).data;
+export const getBranches = async (token, projectId, options = {}) => {
+  const { page = 1, search = "" } = options;
+  const params = {
+    per_page: 20,
+    page,
+    sort: "updated_desc",
+  };
+
+  if (search) {
+    params.search = search;
+  }
+
+  const response = await client(token).get(
+    `/projects/${projectId}/repository/branches`,
+    { params },
+  );
+
+  return {
+    data: response.data,
+    pagination: {
+      nextPage: response.headers["x-next-page"],
+      total: response.headers["x-total"],
+      totalPages: response.headers["x-total-pages"],
+    },
+  };
+};
+
+export const getProjectMembers = async (token, projectId, search = "") => {
+  const params = {
+    per_page: 20, // Limit to 20 for dropdowns
+  };
+  if (search) params.search = search;
+
+  const response = await client(token).get(`/projects/${projectId}/users`, {
+    params,
+  });
+  return response.data;
+};
 
 export const createMR = async (token, pid, payload) =>
   (await client(token).post(`/projects/${pid}/merge_requests`, payload)).data;
