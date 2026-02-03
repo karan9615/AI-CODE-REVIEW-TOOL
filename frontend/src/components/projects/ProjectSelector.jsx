@@ -21,7 +21,7 @@ export function ProjectSelector({
     return projects.filter(
       (p) =>
         p.name?.toLowerCase().includes(search.toLowerCase()) ||
-        p.path_with_namespace?.toLowerCase().includes(search.toLowerCase())
+        p.path_with_namespace?.toLowerCase().includes(search.toLowerCase()),
     );
   }, [projects, search]);
 
@@ -125,7 +125,7 @@ export function ProjectSelector({
                       key={p.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
+                      transition={{ delay: Math.min(index, 20) * 0.05 }}
                     >
                       <ProjectCard project={p} onClick={() => setProject(p)} />
                     </motion.div>

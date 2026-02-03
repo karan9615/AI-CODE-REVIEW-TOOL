@@ -1,8 +1,33 @@
 import { client } from "./gitlabClient.js";
 import { parseDiffLines } from "../utils/diffUtils.js";
 
-export const getProjects = async (token) =>
-  (await client(token).get("/projects?min_access_level=30&per_page=100")).data;
+export const getProjects = async (token) => {
+  const api = client(token);
+  let allProjects = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const response = await api.get("/projects", {
+      params: {
+        membership: true,
+        per_page: 100,
+        page,
+      },
+    });
+
+    allProjects = allProjects.concat(response.data);
+
+    const nextPage = response.headers["x-next-page"];
+    if (nextPage) {
+      page = nextPage;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allProjects;
+};
 
 export const getBranches = async (token, projectId) =>
   (
