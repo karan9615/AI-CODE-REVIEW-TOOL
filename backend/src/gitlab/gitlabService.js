@@ -11,6 +11,9 @@ export const getProjects = async (token) => {
     const response = await api.get("/projects", {
       params: {
         membership: true,
+        archived: false,
+        order_by: "updated_at",
+        sort: "desc",
         per_page: 100,
         page,
       },
