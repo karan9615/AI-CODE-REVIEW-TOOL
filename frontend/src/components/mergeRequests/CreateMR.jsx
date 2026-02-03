@@ -85,6 +85,19 @@ export function CreateMR({ project }) {
     } catch (e) {}
   };
 
+  const handleReset = () => {
+    // Clear all local state
+    setSrc("");
+    setTgt("");
+    setAssignee("");
+    setReviewers([]);
+    setRemoveSourceBranch(false);
+    setModel(""); // Reset model to empty so button disables again
+
+    // Clear hook state (success/error view)
+    resetState();
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       <Card className="overflow-hidden border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl">
@@ -97,11 +110,13 @@ export function CreateMR({ project }) {
               <Sparkles size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-surface">
-                New Merge Request
+              <h2 className="text-xl font-bold text-surface transition-all duration-300">
+                {loading ? "Creating Merge Request..." : "New Merge Request"}
               </h2>
-              <p className="text-surface-muted text-sm">
-                Select branches to analyze and merge
+              <p className="text-surface-muted text-sm transition-all duration-300">
+                {loading
+                  ? "Analyzing code and generating AI review..."
+                  : "Select branches to analyze and merge"}
               </p>
             </div>
           </div>
@@ -131,17 +146,39 @@ export function CreateMR({ project }) {
                     <Sparkles size={40} />
                   </div>
                   <h3 className="text-2xl font-bold text-surface mb-2">
-                    {success.message || "Operation Successful"}
+                    {success.message || "Merge Request Created"}
                   </h3>
+                  <div className="text-surface-muted mb-6 flex flex-col gap-1">
+                    {success.comments?.skipped ? (
+                      <span className="text-yellow-500 font-medium">
+                        {success.comments.reason ||
+                          "Comments skipped (diffs not ready)"}
+                      </span>
+                    ) : (
+                      <span>
+                        <strong className="text-primary">
+                          {success.comments?.posted || 0}
+                        </strong>{" "}
+                        AI comments posted
+                      </span>
+                    )}
+                    <span className="text-sm opacity-70">
+                      Standard review complete
+                    </span>
+                  </div>
                   <Button
                     href={success.web_url || success.url}
                     target="_blank"
-                    className="mt-6"
+                    className="mt-2"
                   >
                     View in GitLab
                   </Button>
-                  <Button variant="ghost" onClick={resetState} className="mt-2">
-                    Back to Form
+                  <Button
+                    variant="ghost"
+                    onClick={handleReset}
+                    className="mt-2"
+                  >
+                    Create Another MR
                   </Button>
                 </motion.div>
               ) : (
