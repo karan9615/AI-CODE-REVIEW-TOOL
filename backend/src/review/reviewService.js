@@ -467,6 +467,8 @@ ${globalFileContext}
 
 **Fix:** [Concrete code example showing the solution] - OPTIONAL
 
+**Similar issues found in:** [List of other file paths where this EXACT same issue occurs. Do NOT create separate comments for those files.] - OPTIONAL
+
 Note: Since you only have access to git diffs (not full codebase), you may not always have enough context to provide a complete Fix. In such cases, provide Issue and Risk at minimum.
 
 ## Example (IDEAL - all 3 sections):
@@ -501,6 +503,7 @@ Note: Since you only have access to git diffs (not full codebase), you may not a
 - Focus on correctness, security, and performance
 - Include imports/dependencies in fix examples if needed
 - If you can't provide a complete Fix due to limited diff context, at least explain what needs to be done
+- **DEDUPLICATE CROSS-FILE ISSUES:** If the exact same issue (e.g., missing error handling, same typo) occurs in multiple files, make ONE comment on the first occurrence. Add a "**Similar issues found in:**" section listing the other file paths it applies to. Do not post separate comments for the duplicates.
 
 ❌ DON'T:
 - Submit comments without Issue section
@@ -509,6 +512,7 @@ Note: Since you only have access to git diffs (not full codebase), you may not a
 - Suggest improvements without clear problems
 - Comment on unchanged context lines
 - Give vague advice ("improve error handling" without details)
+- Create duplicate comments for the exact same issue across different files. Use the 'Similar issues found in' pattern instead.
 
 # LANGUAGE-SPECIFIC CHECKS
 
@@ -566,15 +570,16 @@ Return a JSON array where EVERY comment object MUST have:
 - filePath: string (exact path from diff)
 - line: integer (for added lines) OR oldLine: integer (for deleted lines)
 - severity: "critical" | "high" | "medium"
-- comment: string with REQUIRED Issue section and OPTIONAL Risk/Fix sections:
+- comment: string with REQUIRED Issue section and OPTIONAL Risk/Fix/Similar Issues sections:
   * **Issue:** [problem description] - MANDATORY
   * **Risk:** [impact if not fixed] - OPTIONAL (include when clear)
   * **Fix:** [code solution with example] - OPTIONAL (include when you have enough context)
+  * **Similar issues found in:** [comma-separated list of paths] - OPTIONAL (ONLY USE if the identical issue is found in other files)
 
 Separate sections with \\n\\n (double newlines).
 
-Example of IDEAL comment (all 3 sections):
-"**Issue:** Using alert() for error feedback.\\n\\n**Risk:** alert() blocks script execution and provides poor UX.\\n\\n**Fix:** Use a toast notification:\\n\`\`\`javascript\\nshowToast('Error: Name required', 'error');\\n\`\`\`"
+Example of IDEAL comment (all sections):
+"**Issue:** Using alert() for error feedback.\\n\\n**Risk:** alert() blocks script execution and provides poor UX.\\n\\n**Fix:** Use a toast notification:\\n\`\`\`javascript\\nshowToast('Error: Name required', 'error');\\n\`\`\`\\n\\n**Similar issues found in:** src/utils/format.js, src/components/Button.jsx"
 
 Example of ACCEPTABLE comment (Issue + Risk only):
 "**Issue:** The function parameter is not validated.\\n\\n**Risk:** Invalid input will cause runtime errors."
@@ -627,8 +632,27 @@ Focus on quality over quantity - one well-explained critical issue > ten vague c
   for (const [index, chunk] of chunks.entries()) {
     console.log(`Phase: Processing chunk ${index + 1}/${chunks.length}...`);
 
+    let dynamicCommentsContext = "";
+    if (index > 0 && allComments.length > 0) {
+      // Map to smaller objects to save context tokens, keeping enough info for deduplication
+      const condensedComments = allComments.map((c) => ({
+        file: c.filePath,
+        issue_preview: c.comment.substring(0, 200) + "...",
+      }));
+      
+      dynamicCommentsContext = `
+# COMMENTS ALREADY GENERATED IN PREVIOUS CHUNKS
+You have already generated the following comments for other files in this Merge Request:
+${JSON.stringify(condensedComments, null, 2)}
+
+**CRITICAL INSTRUCTION FOR DEDUPLICATION**: 
+DO NOT report these exact same issues again for files in this current chunk. Assume the developer will fix identical logical errors or missing patterns globally based on your first comment.
+`;
+    }
+
     const chunkPrompt = `
     ${prompt}
+    ${dynamicCommentsContext}
     
 # CODE CHANGES (PART ${index + 1} of ${chunks.length})
 ${JSON.stringify(chunk, null, 2)}
