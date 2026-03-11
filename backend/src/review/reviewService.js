@@ -307,60 +307,64 @@ function validateComment(comment, enrichedDiffs) {
     }
   }
 
-  // 1. Validating "New" Line References (Added lines or Context lines via new_line)
-  if (comment.line) {
-    // Combine added and context lines into one valid set for "new_line"
-    const validNewLines = new Set([...addedLines, ...contextNewLines]);
+  // 1. Smart exact association first
+  let targetFound = false;
 
-    if (validNewLines.has(comment.line)) {
+  // If AI provided 'line' (new line)
+  if (comment.line !== undefined) {
+    if (addedLines.has(comment.line) || contextNewLines.has(comment.line)) {
       isValid = true;
-    } else {
-      // Not found? Snap to nearest
-      const snapped = findClosestLine(comment.line, validNewLines);
-      if (snapped) {
-        console.log(
-          `📍 Snapping comment on ${comment.filePath}: Line ${comment.line} -> ${snapped}`,
-        );
-        comment.comment = `**(Ref: Line ${comment.line})** ${comment.comment}`;
-        comment.line = snapped;
-        isValid = true;
-      } else {
-        console.warn(
-          `❌ ${comment.filePath}: Line ${comment.line} is too far from any valid diff line.`,
-        );
-      }
+      targetFound = true;
+    } else if (deletedLines.has(comment.line)) {
+      // AI confused 'line' for a deleted line ('oldLine')
+      console.log(`Auto-correcting ${comment.filePath}: 'line' ${comment.line} -> 'oldLine'`);
+      comment.oldLine = comment.line;
+      delete comment.line;
+      isValid = true;
+      targetFound = true;
     }
   }
 
-  // 2. Validating "Old" Line References (Deleted lines or Context lines via old_line)
-  if (comment.oldLine && !isValid) {
-    // Combine deleted and context lines (using old index) into one valid set
-    const validOldLines = new Set([...deletedLines, ...contextOldLines]);
-
-    if (validOldLines.has(comment.oldLine)) {
+  // If AI provided 'oldLine' (and we haven't already validated it above)
+  if (comment.oldLine !== undefined && !targetFound) {
+    if (deletedLines.has(comment.oldLine) || contextOldLines.has(comment.oldLine)) {
       isValid = true;
-    } else {
-      // Not found? Snap to nearest
+      targetFound = true;
+    } else if (addedLines.has(comment.oldLine)) {
+      // AI confused 'oldLine' for an added line ('line')
+      console.log(`Auto-correcting ${comment.filePath}: 'oldLine' ${comment.oldLine} -> 'line'`);
+      comment.line = comment.oldLine;
+      delete comment.oldLine;
+      isValid = true;
+      targetFound = true;
+    }
+  }
+
+  // 2. Aggressive snapping (ONLY if the exact line wasn't found in any sensible set)
+  if (!targetFound) {
+    if (comment.line) {
+      const validNewLines = new Set([...addedLines, ...contextNewLines]);
+      const snapped = findClosestLine(comment.line, validNewLines);
+      if (snapped) {
+        console.log(`📍 Snapping comment on ${comment.filePath}: Line ${comment.line} -> ${snapped}`);
+        comment.comment = `**(Ref: Line ${comment.line})** ${comment.comment}`;
+        comment.line = snapped;
+        isValid = true;
+      }
+    } else if (comment.oldLine) {
+      const validOldLines = new Set([...deletedLines, ...contextOldLines]);
       const snapped = findClosestLine(comment.oldLine, validOldLines);
       if (snapped) {
-        console.log(
-          `📍 Snapping comment on ${comment.filePath}: OldLine ${comment.oldLine} -> ${snapped}`,
-        );
+        console.log(`📍 Snapping comment on ${comment.filePath}: OldLine ${comment.oldLine} -> ${snapped}`);
         comment.comment = `**(Ref: OldLine ${comment.oldLine})** ${comment.comment}`;
         comment.oldLine = snapped;
         isValid = true;
-      } else {
-        console.warn(
-          `❌ ${comment.filePath}: OldLine ${comment.oldLine} is too far from any valid diff line.`,
-        );
       }
     }
   }
 
   if (!isValid) {
-    console.warn(
-      `⚠️ Line validation failed for ${comment.filePath}:${comment.line || comment.oldLine}. Preserving as fallback comment.`,
-    );
+    console.warn(`⚠️ Line validation failed for ${comment.filePath}:${comment.line || comment.oldLine}. Preserving as fallback comment.`);
     return comment;
   }
 
@@ -717,7 +721,7 @@ ${JSON.stringify(chunk, null, 2)}
   const validComments = comments
     .filter((comment) => validateCommentStructure(comment))
     .map((comment) => validateComment(comment, enrichedDiffs))
-    .filter(Boolean);
+    .filter(Boolean); // Removes nulls (e.g., binary files or missing files)
 
   console.log(
     `✅ Validated ${validComments.length}/${comments.length} inline comments (structure + line numbers)`,
