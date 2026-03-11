@@ -4,11 +4,20 @@ import { Alert } from "../common/Alert";
 import { Loader } from "../common/Loader";
 import { motion } from "framer-motion";
 import { ThemeToggle } from "../common/ThemeToggle";
+import { useToast } from "../../context/ToastContext";
 
 export function LoginView({ loading, error, onLogin }) {
   const [user, setUser] = useState("");
   const [token, setToken] = useState("");
   const [apiKey, setApiKey] = useState("");
+
+  const { error: toastError } = useToast();
+
+  React.useEffect(() => {
+    if (error) {
+      toastError(error);
+    }
+  }, [error, toastError]);
 
   const handleSubmit = () => {
     if (token) onLogin(user, token, apiKey);
@@ -55,15 +64,7 @@ export function LoginView({ loading, error, onLogin }) {
           </p>
         </div>
 
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            className="mb-6"
-          >
-            <Alert type="error">{error}</Alert>
-          </motion.div>
-        )}
+        {/* Error is now handled by ToastContext */}
 
         <div className="space-y-6">
           <div>

@@ -78,6 +78,26 @@ export class GoogleProvider {
       return result.response.text();
     } catch (error) {
       console.error(`Google Gemini API Error (${model}):`, error.message);
+
+      // Specifically catch free tier quota lockouts which commonly hit Premium models early
+      if (
+        error.status === 429 ||
+        error.message?.includes("429") ||
+        error.message?.includes("quota")
+      ) {
+        if (
+          error.message?.includes("free_tier") ||
+          error.message?.includes("FreeTier")
+        ) {
+          throw new Error(
+            `The selected model (${model}) requires a paid API billing tier or its free quota is exhausted. Please switch to a 'Free Tier' optimized model (e.g. Gemini 2.5 Flash) or upgrade your Gemini API account.`,
+          );
+        }
+        throw new Error(
+          `Gemini API Quota Exceeded (429 Rate Limit) for model ${model}. Please try again later or upgrade your API tier.`,
+        );
+      }
+
       throw new Error(`Gemini generation failed: ${error.message}`);
     }
   }

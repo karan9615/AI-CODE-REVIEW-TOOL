@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Loader } from "../common/Loader";
 import { Alert } from "../common/Alert";
 import { Button } from "../ui/Button";
+import { useToast } from "../../context/ToastContext";
 
 export function ProjectSelector({
   projects,
@@ -20,6 +21,14 @@ export function ProjectSelector({
 }) {
   const [searchValue, setSearchValue] = useState("");
   const observerTarget = React.useRef(null);
+
+  const { error: toastError } = useToast();
+
+  useEffect(() => {
+    if (error) {
+      toastError(error);
+    }
+  }, [error, toastError]);
 
   // Debounce search
   useEffect(() => {
@@ -74,29 +83,7 @@ export function ProjectSelector({
           </motion.p>
         </div>
 
-        {/* Error State */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 max-w-2xl mx-auto"
-          >
-            <Alert type="error">
-              <div className="flex items-center justify-between gap-4">
-                <span>{error}</span>
-                <Button
-                  onClick={onRetry}
-                  disabled={loading}
-                  variant="ghost"
-                  size="sm"
-                  icon={RefreshCw}
-                >
-                  Retry
-                </Button>
-              </div>
-            </Alert>
-          </motion.div>
-        )}
+        {/* Error is handled by ToastContext */}
 
         {/* Search Bar */}
         <div className="mb-10 relative max-w-xl z-10">

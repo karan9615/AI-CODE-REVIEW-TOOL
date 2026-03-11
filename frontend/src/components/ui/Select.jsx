@@ -80,9 +80,8 @@ export function Select({
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
               className="absolute z-50 w-full mt-2 bg-background-secondary/95 dark:bg-[#1e1e2e]/95 backdrop-blur-xl border border-border-color/40 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden ring-1 ring-black/5 dark:ring-white/5"
-              style={{ maxHeight: "240px", overflowY: "auto" }}
             >
-              <ul className="p-1.5 space-y-0.5">
+              <ul className="max-h-[240px] overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
                 {options.length === 0 ? (
                   <li className="px-4 py-8 text-center text-sm text-surface-muted flex flex-col items-center justify-center gap-2">
                     <span className="opacity-50">No options</span>

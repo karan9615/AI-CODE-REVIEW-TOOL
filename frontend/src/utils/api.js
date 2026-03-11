@@ -14,10 +14,12 @@ const apiClient = axios.create({
 // Request interceptor for debugging
 apiClient.interceptors.request.use(
   (config) => {
-    console.log(`🚀 ${config.method.toUpperCase()} ${config.url}`, {
-      data: config.data,
-      params: config.params,
-    });
+    if (import.meta.env.DEV) {
+      console.log(`🚀 ${config.method.toUpperCase()} ${config.url}`, {
+        data: config.data,
+        params: config.params,
+      });
+    }
     return config;
   },
   (error) => {
@@ -29,17 +31,19 @@ apiClient.interceptors.request.use(
 // Response interceptor for debugging and global error handling
 apiClient.interceptors.response.use(
   (response) => {
-    console.log(
-      `✅ ${response.config.method.toUpperCase()} ${response.config.url}`,
-      {
-        status: response.status,
-        data: response.data,
-      },
-    );
+    if (import.meta.env.DEV) {
+      console.log(
+        `✅ ${response.config.method.toUpperCase()} ${response.config.url}`,
+        {
+          status: response.status,
+          data: response.data,
+        },
+      );
+    }
     return response;
   },
   (error) => {
-    if (error.response) {
+    if (error.response && import.meta.env.DEV) {
       console.error(`❌ ${error.response.status} ${error.config.url}`, {
         error: error.response.data,
       });

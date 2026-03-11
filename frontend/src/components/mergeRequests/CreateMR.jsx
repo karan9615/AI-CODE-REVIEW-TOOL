@@ -8,7 +8,8 @@ import { Card, CardContent } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
 import { SearchableSelect } from "../ui/SearchableSelect";
-import { useModels } from "../../contexts/ModelsContext";
+import { useModels } from "../../context/ModelsContext";
+import { useToast } from "../../context/ToastContext";
 
 import { useMergeRequest } from "../../hooks/useMergeRequest";
 
@@ -68,6 +69,8 @@ export function CreateMR({ project }) {
     }
   };
 
+  const { success: toastSuccess, error: toastError } = useToast();
+
   const handleCreate = async () => {
     try {
       if (!src || !tgt) return;
@@ -82,7 +85,10 @@ export function CreateMR({ project }) {
 
       setSrc("");
       setTgt("");
-    } catch (e) {}
+      toastSuccess("Merge Request created successfully");
+    } catch (e) {
+      toastError(e.message || "Failed to create Merge Request");
+    }
   };
 
   const handleReset = () => {
@@ -100,11 +106,11 @@ export function CreateMR({ project }) {
 
   return (
     <div className="w-full max-w-3xl mx-auto">
-      <Card className="overflow-hidden border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl">
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light"></div>
+      <Card className="border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl">
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light rounded-2xl overflow-hidden"></div>
 
         {/* Header Section */}
-        <div className="relative p-8 border-b border-border-color/10 bg-background-secondary/50">
+        <div className="relative p-8 border-b border-border-color/10 bg-background-secondary/50 rounded-t-2xl">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
               <Sparkles size={24} />

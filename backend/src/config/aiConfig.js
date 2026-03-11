@@ -60,7 +60,38 @@ export const AI_PROVIDERS = {
           model: "gemini-2.5-flash",
           temperature: 0.2,
         },
-        recommended: true,
+        recommended: false,
+      },
+      {
+        key: "gemini-2.5-pro",
+        label: "Gemini 2.5 Pro (gemini-2.5-pro) - Adv Free Tier",
+        provider: "google",
+        config: {
+          model: "gemini-2.5-pro",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+      {
+        key: "gemini-2.5-flash",
+        label: "Gemini 2.5 Flash (gemini-2.5-flash) - Free Tier Fast",
+        provider: "google",
+        config: {
+          model: "gemini-2.5-flash",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+      {
+        key: "gemini-2.5-flash-lite",
+        label:
+          "Gemini 2.5 Flash Lite (gemini-2.5-flash-lite) - Free Tier Lightweight",
+        provider: "google",
+        config: {
+          model: "gemini-2.5-flash-lite",
+          temperature: 0.2,
+        },
+        recommended: false,
       },
       {
         key: "gemini-flash",
@@ -71,6 +102,67 @@ export const AI_PROVIDERS = {
           temperature: 0.2,
         },
         recommended: false,
+      },
+      {
+        key: "gemini-1.5-pro",
+        label: "Gemini 1.5 Pro (gemini-1.5-pro) - Powerful",
+        provider: "google",
+        config: {
+          model: "gemini-1.5-pro",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+      {
+        key: "gemini-1.5-flash-8b",
+        label: "Gemini 1.5 Flash-8B (gemini-1.5-flash-8b) - Lightweight",
+        provider: "google",
+        config: {
+          model: "gemini-1.5-flash-8b",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+      {
+        key: "gemini-2.0-flash",
+        label: "Gemini 2.0 Flash (gemini-2.0-flash) - Next Gen Fast",
+        provider: "google",
+        config: {
+          model: "gemini-2.0-flash",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+      {
+        key: "gemini-2.0-flash-lite",
+        label:
+          "Gemini 2.0 Flash Lite (gemini-2.0-flash-lite) - Next Gen Efficient",
+        provider: "google",
+        config: {
+          model: "gemini-2.0-flash-lite-preview-02-05",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+      {
+        key: "gemini-2.0-pro-exp",
+        label: "Gemini 2.0 Pro Exp (gemini-2.0-pro-exp) - Next Gen Powerful",
+        provider: "google",
+        config: {
+          model: "gemini-2.0-pro-exp-02-05",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+      {
+        key: "gemini-3.1-flash-lite-preview",
+        label: "Gemini 3.1 Flash Lite (gemini-3.1-flash-lite-preview) - Recommended Free Tier",
+        provider: "google",
+        config: {
+          model: "gemini-3.1-flash-lite-preview",
+          temperature: 0.2,
+        },
+        recommended: true,
       },
     ],
   },

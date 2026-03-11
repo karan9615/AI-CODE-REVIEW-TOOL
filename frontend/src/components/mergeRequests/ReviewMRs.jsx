@@ -10,7 +10,8 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Select } from "../ui/Select";
 import { Card, CardContent } from "../ui/Card";
-import { useModels } from "../../contexts/ModelsContext";
+import { useModels } from "../../context/ModelsContext";
+import { useToast } from "../../context/ToastContext";
 
 import { useMergeRequest } from "../../hooks/useMergeRequest";
 
@@ -74,6 +75,8 @@ export function ReviewMRs({ project }) {
     resetState();
   };
 
+  const { success: toastSuccess, error: toastError } = useToast();
+
   const startReview = async () => {
     if (!selectedMR) return;
 
@@ -84,8 +87,9 @@ export function ReviewMRs({ project }) {
 
     try {
       await reviewMR(selectedMR.iid, selectedModel);
+      toastSuccess(`Code Review completed for MR #${selectedMR.iid}`);
     } catch (err) {
-      // Handled by hook
+      toastError(err.message || "Failed to complete AI review.");
     } finally {
       setReviewingIid(null);
     }
@@ -100,7 +104,9 @@ export function ReviewMRs({ project }) {
 
     try {
       await updateMRContent(selectedMR.iid, selectedModel);
-    } catch (e) {
+      toastSuccess(`MR details enhanced for #${selectedMR.iid}`);
+    } catch (err) {
+      toastError(err.message || "Failed to enhance MR details.");
     } finally {
       setReviewingIid(null);
     }
@@ -116,12 +122,12 @@ export function ReviewMRs({ project }) {
 
   return (
     <div className="w-full max-w-3xl mx-auto">
-      <Card className="overflow-hidden border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl">
+      <Card className="border-0 ring-1 ring-border-color/10 shadow-2xl relative bg-background-secondary/40 backdrop-blur-xl">
         {/* Decorative Grid Background */}
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light"></div>
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none mix-blend-soft-light rounded-2xl overflow-hidden"></div>
 
         {/* Header Section */}
-        <div className="relative p-6 sm:p-8 border-b border-border-color/10 bg-background-secondary/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="relative p-6 sm:p-8 border-b border-border-color/10 bg-background-secondary/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 rounded-t-2xl">
           <div className="flex items-center gap-4">
             <div
               className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-colors duration-300 ${

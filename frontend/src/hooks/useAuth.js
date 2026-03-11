@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "../utils/api";
+import { useToast } from "../context/ToastContext";
 
 export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -33,20 +34,30 @@ export const useAuth = () => {
     }
   };
 
-  const login = async (token) => {
+  /* import useToast MUST be added at the top */
+  const toast = useToast();
+
+  const login = async (username, token, apiKey) => {
     setLoading(true);
     setError(null);
     try {
-      const authResponse = await api("/auth/login", { token });
+      const authResponse = await api("/auth/login", { token, apiKey });
+
       if (authResponse.success) {
         setIsAuthenticated(true);
         setUser(authResponse.user);
+        toast.success("Successfully logged in!");
+
         return true;
       }
-      setError("Login failed");
+      const msg = "Login failed. Please check your token.";
+      setError(msg);
+      toast.error(msg);
       return false;
     } catch (err) {
-      setError(err.message || "Login failed");
+      const msg = err.message || "Login failed";
+      setError(msg);
+      toast.error(msg);
       return false;
     } finally {
       setLoading(false);
