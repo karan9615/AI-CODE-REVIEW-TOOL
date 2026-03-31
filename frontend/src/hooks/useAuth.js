@@ -37,7 +37,7 @@ export const useAuth = () => {
   /* import useToast MUST be added at the top */
   const toast = useToast();
 
-  const login = async (username, token, apiKey) => {
+  const login = async (token, apiKey) => {
     setLoading(true);
     setError(null);
     try {

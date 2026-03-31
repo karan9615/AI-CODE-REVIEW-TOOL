@@ -3,6 +3,7 @@ import { validateToken } from "../middleware/authMiddleware.js";
 import {
   validateMRCreation,
   validateReview,
+  validateUpdateContent,
   handleValidation,
 } from "../middleware/validator.js";
 import {
@@ -28,6 +29,12 @@ router.post(
   reviewMR,
 );
 
-router.post("/update-content", validateToken, updateMRContent);
+router.post(
+  "/update-content",
+  validateToken,
+  validateUpdateContent,
+  handleValidation,
+  updateMRContent,
+);
 
 export default router;

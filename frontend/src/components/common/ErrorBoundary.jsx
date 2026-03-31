@@ -56,7 +56,7 @@ export class ErrorBoundary extends Component {
               We're sorry for the inconvenience. The application encountered an unexpected error.
             </p>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <details className="mb-6 text-left">
                 <summary className="cursor-pointer text-sm text-surface-muted hover:text-surface">
                   Error Details (Development Only)

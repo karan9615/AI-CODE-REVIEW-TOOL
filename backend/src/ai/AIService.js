@@ -137,7 +137,4 @@ export class AIService {
   }
 }
 
-// Legacy compatibility: Export old function names
-export async function runAI(modelKey, prompt) {
-  return await AIService.generate(modelKey, prompt);
-}
+// Legacy export removed — use aiRouter.js runAI which correctly passes config (responseSchema, apiKey)

@@ -36,17 +36,19 @@ export function CreateMR({ project }) {
 
   const fetchBranches = async (query, page) => {
     try {
+      // POST body carries projectId; page & search go into the URL query-string
+      // Backend reads: req.body.projectId, req.query.page, req.query.search
       const res = await api(
-        `/branches?page=${page}&search=${query}`,
+        `/branches?page=${page}&search=${encodeURIComponent(query)}`,
         { projectId: project.id },
         "POST",
       );
       return {
-        options: res.data.map((b) => ({ label: b.name, value: b.name })),
+        options: (res.data || []).map((b) => ({ label: b.name, value: b.name })),
         hasMore: !!res.pagination?.nextPage,
       };
     } catch (e) {
-      console.error(e);
+      console.error("fetchBranches error:", e);
       return { options: [], hasMore: false };
     }
   };
@@ -74,6 +76,13 @@ export function CreateMR({ project }) {
   const handleCreate = async () => {
     try {
       if (!src || !tgt) return;
+
+      // Guard: source and target must differ
+      if (src === tgt) {
+        toastError("Source and target branches cannot be the same.");
+        return;
+      }
+
       await createMR({
         sourceBranch: src,
         targetBranch: tgt,
@@ -154,18 +163,22 @@ export function CreateMR({ project }) {
                   <h3 className="text-2xl font-bold text-surface mb-2">
                     {success.message || "Merge Request Created"}
                   </h3>
-                  <div className="text-surface-muted mb-6 flex flex-col gap-1">
+                  <div className="text-surface-muted mb-6 flex flex-col gap-2">
                     {success.comments?.skipped ? (
-                      <span className="text-yellow-500 font-medium">
-                        {success.comments.reason ||
-                          "Comments skipped (diffs not ready)"}
-                      </span>
+                      <Alert type="warning">
+                        {success.comments.reason || "AI comments were skipped — diff refs not ready yet. View the MR in GitLab to retry manually."}
+                      </Alert>
                     ) : (
                       <span>
                         <strong className="text-primary">
                           {success.comments?.posted || 0}
                         </strong>{" "}
-                        AI comments posted
+                        AI review comment{(success.comments?.posted || 0) !== 1 ? "s" : ""} posted
+                        {success.comments?.failed > 0 && (
+                          <span className="text-yellow-500 ml-1 text-sm">
+                            ({success.comments.failed} failed)
+                          </span>
+                        )}
                       </span>
                     )}
                     <span className="text-sm opacity-70">
@@ -173,7 +186,7 @@ export function CreateMR({ project }) {
                     </span>
                   </div>
                   <Button
-                    href={success.web_url || success.url}
+                    href={success.url}
                     target="_blank"
                     className="mt-2"
                   >

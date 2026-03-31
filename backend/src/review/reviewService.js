@@ -11,8 +11,13 @@ let cachedRules = null;
  */
 function loadRules() {
   if (!cachedRules) {
-    const rulesPath = path.join(process.cwd(), "config", "review.rules.json");
-    cachedRules = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
+    try {
+      const rulesPath = path.join(process.cwd(), "config", "review.rules.json");
+      cachedRules = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
+    } catch (err) {
+      console.warn("⚠️ Failed to load review.rules.json:", err.message, "— using empty rules.");
+      cachedRules = {};
+    }
   }
   return cachedRules;
 }
@@ -220,9 +225,6 @@ function validateCommentStructure(comment) {
   return true;
 }
 
-/**
- * Validate a single comment against enriched diff data
- */
 /**
  * Validate a single comment against enriched diff data
  */

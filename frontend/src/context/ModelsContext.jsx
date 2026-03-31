@@ -33,9 +33,12 @@ export function ModelsProvider({ children }) {
     } catch (err) {
       console.error("Failed to load AI models:", err.message);
       setError(err.message);
-      if (!isInitial) {
-        toastError(err.message || "Failed to load models");
-      }
+      // Always inform user — even on initial load — that fallback models are being used
+      toastError(
+        isInitial
+          ? "Could not fetch AI models from server. Using built-in defaults."
+          : (err.message || "Failed to load models"),
+      );
 
       // Fallback to default models if API fails
       setModels([

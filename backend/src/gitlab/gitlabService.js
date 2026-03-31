@@ -212,13 +212,13 @@ export const createInlineComment = async (
       );
     }
   } else if (oldLine && !line) {
-    // Deleted line
-    if (diffData.deletedLines.has(oldLine)) {
+    // Deleted line or context old line
+    if (diffData.deletedLines.has(oldLine) || diffData.contextLines.has(oldLine)) {
       finalOldLine = oldLine;
       useOldLine = true;
     } else {
       throw new Error(
-        `Old line ${oldLine} in ${filePath} is not a deleted line`,
+        `Old line ${oldLine} in ${filePath} is not a deleted or context line`,
       );
     }
   } else if (line && oldLine) {
@@ -334,7 +334,7 @@ export const getDiffRefsWithRetry = async (
       );
     }
 
-    await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+    await new Promise((r) => setTimeout(r, delayMs * Math.pow(2, i)));
   }
 
   return null;

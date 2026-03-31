@@ -15,6 +15,12 @@ export const validateReview = [
   body("model").notEmpty().withMessage("Model is required"),
 ];
 
+export const validateUpdateContent = [
+  body("projectId").notEmpty().withMessage("Project ID is required"),
+  body("mrIid").notEmpty().withMessage("MR IID is required"),
+  body("model").notEmpty().withMessage("Model is required").isString(),
+];
+
 // Reusable middleware to handle validation errors
 export const handleValidation = (req, res, next) => {
   const errors = validationResult(req);

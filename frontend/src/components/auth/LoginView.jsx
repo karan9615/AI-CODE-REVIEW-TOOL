@@ -4,26 +4,19 @@ import { Alert } from "../common/Alert";
 import { Loader } from "../common/Loader";
 import { motion } from "framer-motion";
 import { ThemeToggle } from "../common/ThemeToggle";
-import { useToast } from "../../context/ToastContext";
 
 export function LoginView({ loading, error, onLogin }) {
-  const [user, setUser] = useState("");
   const [token, setToken] = useState("");
   const [apiKey, setApiKey] = useState("");
 
-  const { error: toastError } = useToast();
-
-  React.useEffect(() => {
-    if (error) {
-      toastError(error);
-    }
-  }, [error, toastError]);
+  // Note: toasts for login errors are fired by useAuth directly.
+  // The `error` prop is kept for future reference but no longer triggers a duplicate toast here.
 
   const handleSubmit = () => {
-    if (token) onLogin(user, token, apiKey);
+    if (token) onLogin(token, apiKey);
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === "Enter" && !loading) handleSubmit();
   };
 
@@ -69,20 +62,6 @@ export function LoginView({ loading, error, onLogin }) {
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">
-              Username or Email
-            </label>
-            <input
-              className="input-field"
-              placeholder="Enter your GitLab username"
-              value={user}
-              onChange={(e) => setUser(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">
               Personal Access Token <span className="text-accent-pink">*</span>
             </label>
             <input
@@ -91,7 +70,7 @@ export function LoginView({ loading, error, onLogin }) {
               placeholder="glpat-xxxxxxxxxxxxxxxxxxxx"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               disabled={loading}
             />
             <p className="text-xs text-surface-muted/70 mt-2 ml-1">
@@ -113,6 +92,7 @@ export function LoginView({ loading, error, onLogin }) {
               placeholder="Gemini/OpenAI API Key"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              onKeyDown={handleKeyDown}
             />
           </div>
 

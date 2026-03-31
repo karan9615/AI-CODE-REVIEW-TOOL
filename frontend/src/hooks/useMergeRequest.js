@@ -96,7 +96,7 @@ export const useMergeRequest = (projectId) => {
 
       return result;
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Failed to complete AI review");
       setProgress([]);
       throw err;
     } finally {
@@ -132,6 +132,10 @@ export const useMergeRequest = (projectId) => {
       );
 
       if (result.error) throw new Error(result.error);
+
+      // Complete progress (same pattern as createMR / reviewMR)
+      setProgress((p) => p.map((s) => ({ ...s, status: "complete" })));
+
       setSuccess({
         message: "MR Title & Description updated successfully!",
         iid: mrIid,
@@ -139,6 +143,7 @@ export const useMergeRequest = (projectId) => {
       });
     } catch (err) {
       setError(err.message || "Failed to update MR content");
+      setProgress([]); // Clear stuck progress on failure
     } finally {
       setLoading(false);
     }

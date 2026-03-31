@@ -126,6 +126,12 @@ export const updateMRContent = async (req, res) => {
     const { projectId, mrIid, model } = req.body;
     const token = req.token;
 
+    if (!projectId || !mrIid || !model) {
+      return res.status(400).json({
+        error: "projectId, mrIid, and model are required",
+      });
+    }
+
     const customApiKey = req.session?.apiKey || req.headers["x-ai-api-key"];
 
     const result = await mrService.updateMRContent(
@@ -136,7 +142,12 @@ export const updateMRContent = async (req, res) => {
       customApiKey,
     );
 
-    res.json(result);
+    res.json({
+      success: true,
+      iid: result?.iid || mrIid,
+      url: result?.web_url || null,
+      title: result?.title || null,
+    });
   } catch (e) {
     console.error("MR update failed:", e.message);
     res.status(500).json({

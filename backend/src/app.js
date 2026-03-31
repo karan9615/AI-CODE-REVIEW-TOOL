@@ -190,7 +190,7 @@ app.use((err, req, res, next) => {
     message: err.message,
     path: req.path,
     method: req.method,
-    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    stack: envConfig.nodeEnv === "development" ? err.stack : undefined,
   });
 
   const statusCode = err.statusCode || 500;

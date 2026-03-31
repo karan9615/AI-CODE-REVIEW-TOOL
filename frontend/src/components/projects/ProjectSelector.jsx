@@ -83,7 +83,17 @@ export function ProjectSelector({
           </motion.p>
         </div>
 
-        {/* Error is handled by ToastContext */}
+        {/* Persistent inline error — toast auto-dismisses but errors should stay visible */}
+        {error && (
+          <div className="mb-8 max-w-xl">
+            <Alert type="error">
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold">Failed to load projects</span>
+                <span className="text-sm opacity-90">{error}</span>
+              </div>
+            </Alert>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="mb-10 relative max-w-xl z-10">

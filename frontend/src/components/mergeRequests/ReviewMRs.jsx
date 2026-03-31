@@ -54,7 +54,10 @@ export function ReviewMRs({ project }) {
     setListError(null);
     try {
       const data = await api("/mrs", { projectId: project.id });
-      if (data.error) throw new Error(data.error);
+      // Check error before assigning to state
+      if (data?.error) throw new Error(data.error);
+      // Guard: backend should return an array
+      if (!Array.isArray(data)) throw new Error("Unexpected response format from server");
       setMrs(data);
     } catch (err) {
       setListError("Failed to load merge requests: " + err.message);
@@ -233,9 +236,22 @@ export function ReviewMRs({ project }) {
                               : `Enhancement Complete for MR #${reviewSuccess.iid}`}
                           </span>
                           <span className="text-sm opacity-90">
-                            {actionType === "review"
-                              ? `${reviewSuccess.comments?.posted} comments posted successfully.`
-                              : "Title & Description have been updated."}
+                            {actionType === "review" ? (
+                              reviewSuccess.comments?.posted > 0 ? (
+                                <>
+                                  <strong>{reviewSuccess.comments.posted}</strong> comment{reviewSuccess.comments.posted !== 1 ? "s" : ""} posted successfully.
+                                  {reviewSuccess.comments?.failed > 0 && (
+                                    <span className="text-yellow-500 ml-1">
+                                      {reviewSuccess.comments.failed} failed to post.
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                "✅ No issues found — code looks good!"
+                              )
+                            ) : (
+                              "Title & Description have been updated."
+                            )}
                           </span>
                         </div>
                       </Alert>
