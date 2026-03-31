@@ -83,7 +83,7 @@ app.use(
     credentials: true, // REQUIRED for cookies
     allowedHeaders: ["Content-Type", "Authorization"],
     exposedHeaders: ["Set-Cookie"],
-    maxAge: 86400, // Cache preflight for 24 hours
+    maxAge: 2592000, // Cache preflight for 30 days (in seconds)
   })
 );
 
@@ -102,7 +102,7 @@ app.use(
   cookieSession({
     name: "session",
     keys: [envConfig.sessionSecret],
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     secure: isProduction || isCrossDomain, // True for Prod/Render, False for localhost
     httpOnly: true, // Prevents JS access
     sameSite: isCrossDomain ? "none" : "lax", // 'none' required for cross-site cookies

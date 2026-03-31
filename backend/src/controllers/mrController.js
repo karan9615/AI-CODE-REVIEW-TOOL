@@ -34,7 +34,7 @@ import { isValidModel, getValidModelKeys } from "../config/aiConfig.js";
  */
 export const createMR = async (req, res) => {
   try {
-    const { projectId, model, mr } = req.body;
+    const { projectId, model, mr, projectContext } = req.body;
     const token = req.token; // Set by authMiddleware
 
     // Validate AI model
@@ -56,6 +56,7 @@ export const createMR = async (req, res) => {
       model,
       mr,
       customApiKey,
+      projectContext,
     );
 
     // Send success response
@@ -86,7 +87,7 @@ export const createMR = async (req, res) => {
  */
 export const reviewMR = async (req, res) => {
   try {
-    const { projectId, mrIid, model } = req.body;
+    const { projectId, mrIid, model, projectContext } = req.body;
     const token = req.token; // Set by authMiddleware
 
     // Validate AI model
@@ -108,6 +109,7 @@ export const reviewMR = async (req, res) => {
       mrIid,
       model,
       customApiKey,
+      projectContext,
     );
 
     // Send success response
@@ -123,7 +125,7 @@ export const reviewMR = async (req, res) => {
 
 export const updateMRContent = async (req, res) => {
   try {
-    const { projectId, mrIid, model } = req.body;
+    const { projectId, mrIid, model, projectContext } = req.body;
     const token = req.token;
 
     if (!projectId || !mrIid || !model) {
@@ -140,6 +142,7 @@ export const updateMRContent = async (req, res) => {
       mrIid,
       model,
       customApiKey,
+      projectContext,
     );
 
     res.json({

@@ -50,6 +50,7 @@ export const mrService = {
       remove_source_branch,
     },
     apiKey = null,
+    projectContext = "",
   ) {
     logger.info(`Creating MR: ${source_branch} -> ${target_branch}`);
 
@@ -72,6 +73,7 @@ export const mrService = {
       model,
       diffs,
       apiKey,
+      projectContext,
     );
     logger.info(`Generated MR title: ${title}`);
 
@@ -143,7 +145,7 @@ export const mrService = {
     logger.info(`Fetched ${mrDiffs.length} diffs for inline review`);
 
     // Step 6: Generate AI review comments
-    const comments = await generateInlineReviews(model, mrDiffs, [], apiKey);
+    const comments = await generateInlineReviews(model, mrDiffs, [], apiKey, projectContext);
     logger.info(`Generated ${comments.length} inline comments`);
 
     // Step 7: Post inline comments (with error handling per comment)
@@ -164,7 +166,7 @@ export const mrService = {
     };
   },
 
-  async updateMRContent(token, projectId, mrIid, model, apiKey = null) {
+  async updateMRContent(token, projectId, mrIid, model, apiKey = null, projectContext = "") {
     logger.info(`Updating content for MR !${mrIid}`);
 
     // Get MR diffs
@@ -180,6 +182,7 @@ export const mrService = {
       model,
       diffs,
       apiKey,
+      projectContext,
     );
 
     logger.info(`Generated new title: ${title}`);
@@ -202,7 +205,7 @@ export const mrService = {
    * @param {string} model - AI model name
    * @returns {Promise<Object>} Result object with comment statistics
    */
-  async reviewExistingMR(token, projectId, mrIid, model, apiKey = null) {
+  async reviewExistingMR(token, projectId, mrIid, model, apiKey = null, projectContext = "") {
     logger.info(`Starting AI review for MR #${mrIid}`);
 
     // Step 1: Get MR details and validate state
@@ -269,6 +272,7 @@ export const mrService = {
       mrDiffs,
       existingCommentsForAI,
       apiKey,
+      projectContext,
     );
     logger.info(
       `Generated ${comments.length} inline comments (AI aware of ${existingCommentsForAI.length} existing)`,

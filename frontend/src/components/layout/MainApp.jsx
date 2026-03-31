@@ -3,9 +3,13 @@ import { GitMerge, GitPullRequest, ArrowLeft, LogOut } from "lucide-react";
 import { ThemeToggle } from "../common/ThemeToggle";
 import { CreateMR } from "../mergeRequests/CreateMR";
 import { ReviewMRs } from "../mergeRequests/ReviewMRs";
+import { ProjectContextModal } from "../projects/ProjectContextModal";
 import { motion, AnimatePresence } from "framer-motion";
+import { Book } from "lucide-react";
 
 export function MainApp({ project, view, setView, onBack, logout }) {
+  const [isContextModalOpen, setIsContextModalOpen] = React.useState(false);
+
   const tabs = [
     { id: "create", label: "Create Request", icon: GitMerge },
     { id: "review", label: "Review Requests", icon: GitPullRequest },
@@ -76,6 +80,18 @@ export function MainApp({ project, view, setView, onBack, logout }) {
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsContextModalOpen(true)}
+              className="p-2 text-surface-muted hover:text-primary hover:bg-primary/10 rounded-full transition-colors relative"
+              title="Project AI Context"
+            >
+              <Book size={20} />
+              {/* Optional: Add a dot indicator if context exists via localStorage */}
+              {localStorage.getItem(`ai_context_${project?.id}`) && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
+              )}
+            </button>
+            <div className="h-8 w-[1px] bg-border-color/20 mx-1"></div>
             <ThemeToggle />
             <div className="h-8 w-[1px] bg-border-color/20 mx-1"></div>
             <button
@@ -132,6 +148,12 @@ export function MainApp({ project, view, setView, onBack, logout }) {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      <ProjectContextModal 
+        isOpen={isContextModalOpen} 
+        onClose={() => setIsContextModalOpen(false)} 
+        project={project} 
+      />
     </div>
   );
 }

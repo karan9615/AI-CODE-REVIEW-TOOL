@@ -25,11 +25,15 @@ function loadRules() {
 /**
  * Generate MR title + description
  */
-export async function generateMRContent(model, diffs, apiKey = null) {
+export async function generateMRContent(model, diffs, apiKey = null, projectContext = "") {
   const rules = loadRules();
 
-  const prompt = `You are a Senior Software Engineer reviewing a GitLab Merge Request.
+  const contextString = projectContext 
+    ? `\n## PROJECT CONTEXT & GUIDELINES\nThe user has provided the following specific rules for this repository. You MUST adhere to these rules when analyzing the code:\n${projectContext}\n` 
+    : "";
 
+  const prompt = `You are a Senior Software Engineer reviewing a GitLab Merge Request.
+${contextString}
 Your job is to generate a PRODUCTION-READY, ACCURATE Merge Request title and description based ONLY on the provided code diffs. Do NOT invent or assume context that is not present in the diffs.
 
 ## Title (max 72 chars)
@@ -386,6 +390,7 @@ export async function generateInlineReviews(
   diffs,
   existingComments = [],
   apiKey = null,
+  projectContext = "",
 ) {
   const enrichedDiffs = buildEnrichedDiffs(diffs);
   const rules = loadRules();
@@ -398,9 +403,13 @@ export async function generateInlineReviews(
     )
     .join("\n");
 
+  const contextString = projectContext 
+    ? `\n# PROJECT CONTEXT & RULES\nThe user has provided the following specific guidelines for this repository. You MUST enforce these rules heavily when reviewing the code:\n${projectContext}\n` 
+    : "";
+
   const prompt = `
 You are a **Senior Software Engineer** doing a critical code review for a GitLab Merge Request for production deployment.
-
+${contextString}
 # MISSION
 Review the code changes below and ONLY generate actionable, specific comments that require the developer to update or improve the code. Do NOT add info comments, explanations, or compliments. Only comment if a real, actionable change is needed.
 

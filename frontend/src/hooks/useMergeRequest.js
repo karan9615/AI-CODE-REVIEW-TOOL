@@ -30,9 +30,13 @@ export const useMergeRequest = (projectId) => {
       // Fake progress for UX (since Backend doesn't stream progress yet)
       await updateProgressFake();
 
+      // Read optional project context from local storage
+      const projectContext = localStorage.getItem(`ai_context_${projectId}`) || "";
+
       const result = await api("/mr", {
         projectId,
         model,
+        projectContext,
         mr: {
           source_branch: sourceBranch,
           target_branch: targetBranch,
@@ -79,10 +83,13 @@ export const useMergeRequest = (projectId) => {
     try {
       await updateProgressFake();
 
+      const projectContext = localStorage.getItem(`ai_context_${projectId}`) || "";
+
       const result = await api("/review-mr", {
         projectId,
         mrIid,
         model,
+        projectContext,
       });
 
       if (result.error) throw new Error(result.error);
@@ -121,12 +128,15 @@ export const useMergeRequest = (projectId) => {
     try {
       await updateProgressFake();
 
+      const projectContext = localStorage.getItem(`ai_context_${projectId}`) || "";
+
       const result = await api(
         "/update-content",
         {
           projectId,
           mrIid,
           model,
+          projectContext,
         },
         "POST",
       );
