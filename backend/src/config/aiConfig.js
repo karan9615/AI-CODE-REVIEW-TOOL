@@ -166,24 +166,42 @@ export const AI_PROVIDERS = {
       },
     ],
   },
-  // Easy to add new providers:
-  // anthropic: {
-  //   name: "Anthropic",
-  //   enabled: false,
-  //   models: [
-  //     {
-  //       key: "claude-3-opus",
-  //       label: "Claude 3 Opus - Most Intelligent",
-  //       provider: "anthropic",
-  //       config: {
-  //         model: "claude-3-opus-20240229",
-  //         temperature: 0.2,
-  //         maxTokens: 4000,
-  //       },
-  //       recommended: true,
-  //     },
-  //   ],
-  // },
+  mistral: {
+    name: "Mistral",
+    enabled: true,
+    models: [
+      {
+        key: "mistral-large",
+        label: "Mistral Large (mistral-large-latest) - High Precision",
+        provider: "mistral",
+        config: {
+          model: "mistral-large-latest",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+      {
+        key: "mistral-small",
+        label: "Mistral Small (mistral-small-latest) - Fast",
+        provider: "mistral",
+        config: {
+          model: "mistral-small-latest",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+      {
+        key: "pixtral-large",
+        label: "Pixtral Large (pixtral-large-latest) - SOTA",
+        provider: "mistral",
+        config: {
+          model: "pixtral-large-latest",
+          temperature: 0.2,
+        },
+        recommended: false,
+      },
+    ],
+  },
 };
 
 /**

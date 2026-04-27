@@ -28,6 +28,32 @@ export class GoogleProvider {
   }
 
   /**
+   * List available models from Google
+   */
+  async listModels(apiKey = null) {
+    const key = apiKey || envConfig.geminiApiKey;
+    if (!key) return [];
+
+    try {
+      const { default: axios } = await import("axios");
+      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+      const response = await axios.get(url);
+
+      return response.data.models
+        .filter((m) => m.supportedGenerationMethods.includes("generateContent"))
+        .map((m) => ({
+          key: m.name.replace("models/", ""),
+          label: `${m.displayName} (${m.name.replace("models/", "")})`,
+          provider: "google",
+          config: { model: m.name.replace("models/", "") },
+        }));
+    } catch (error) {
+      console.error("Google listModels error:", error.message);
+      return [];
+    }
+  }
+
+  /**
    * Generate completion using Google Gemini models
    * @param {string} prompt - The prompt to send
    * @param {Object} config - Model configuration
@@ -99,6 +125,34 @@ export class GoogleProvider {
       }
 
       throw new Error(`Gemini generation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate embedding for text
+   * @param {string} text - The text to embed
+   * @param {Object} config - Configuration (model)
+   * @returns {Promise<Array<number>>} The embedding vector
+   */
+  async embed(text, config = {}) {
+    const { apiKey, model = "text-embedding-004" } = config;
+    let client = this.client;
+
+    if (apiKey) {
+      client = new GoogleGenerativeAI(apiKey);
+    }
+
+    if (!client) {
+      throw new Error("Google provider not configured.");
+    }
+
+    try {
+      const embeddingModel = client.getGenerativeModel({ model });
+      const result = await embeddingModel.embedContent(text);
+      return result.embedding.values;
+    } catch (error) {
+      console.error(`Google Gemini Embedding Error (${model}):`, error.message);
+      throw new Error(`Gemini embedding failed: ${error.message}`);
     }
   }
 }

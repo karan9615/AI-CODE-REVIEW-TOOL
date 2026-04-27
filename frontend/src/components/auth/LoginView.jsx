@@ -8,12 +8,13 @@ import { ThemeToggle } from "../common/ThemeToggle";
 export function LoginView({ loading, error, onLogin }) {
   const [token, setToken] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [provider, setProvider] = useState("google");
 
   // Note: toasts for login errors are fired by useAuth directly.
   // The `error` prop is kept for future reference but no longer triggers a duplicate toast here.
 
   const handleSubmit = () => {
-    if (token) onLogin(token, apiKey);
+    if (token) onLogin(token, apiKey, provider);
   };
 
   const handleKeyDown = (e) => {
@@ -81,7 +82,23 @@ export function LoginView({ loading, error, onLogin }) {
 
           <div>
             <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">
-              AI API Key (Optional){" "}
+              AI Provider
+            </label>
+            <select
+              className="input-field"
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+              disabled={loading}
+            >
+              <option value="google">Google Gemini</option>
+              <option value="openai">OpenAI</option>
+              <option value="mistral">Mistral AI</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-surface-muted mb-2 ml-1">
+              {provider.charAt(0).toUpperCase() + provider.slice(1)} API Key (Optional){" "}
               <span className="text-surface-muted/50 text-xs font-normal">
                 - For your own billing
               </span>
@@ -89,7 +106,7 @@ export function LoginView({ loading, error, onLogin }) {
             <input
               type="password"
               className="input-field"
-              placeholder="Gemini/OpenAI API Key"
+              placeholder={`${provider.charAt(0).toUpperCase() + provider.slice(1)} API Key`}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               onKeyDown={handleKeyDown}

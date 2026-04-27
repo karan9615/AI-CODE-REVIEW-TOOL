@@ -13,8 +13,11 @@ if (!sessionSecret && nodeEnv === "production") {
 export default {
   openApiKey: process.env.OPENAI_API_KEY,
   geminiApiKey: process.env.GEMINI_API_KEY,
+  huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY,
   port: process.env.PORT || 3001,
   nodeEnv,
   clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
   sessionSecret: sessionSecret || "secure-session-key-change-me-in-production",
+  supabaseUrl: process.env.SUPABASE_URL,
+  supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY,
 };

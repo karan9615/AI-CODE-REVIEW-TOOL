@@ -138,6 +138,16 @@
   @apply w-full px-4 py-3 bg-background-secondary border border-border-color rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all outline-none text-surface placeholder:text-surface-muted/50 shadow-sm dark:bg-background-tertiary/50 dark:border-white/10;
 }
 
+/* Custom styling for select elements */
+select.input-field {
+  @apply appearance-none cursor-pointer pr-10;
+  /* Using %236B7280 (hex #6B7280) to match surface-muted color */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1.25rem;
+}
+
 :root:not(.dark) .input-field:focus {
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
 }

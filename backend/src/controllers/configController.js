@@ -1,5 +1,9 @@
-import { AI_MODELS } from "../config/models.js";
+import { AIService } from "../ai/AIService.js";
 
-export const getAIModels = (req, res) => {
-  res.json(AI_MODELS);
+export const getAIModels = async (req, res) => {
+  const models = await AIService.getAvailableModels(req.session?.aiConfig);
+  res.json(models.map(m => ({
+    key: m.key,
+    label: m.recommended ? `${m.label} - Recommended` : m.label,
+  })));
 };
