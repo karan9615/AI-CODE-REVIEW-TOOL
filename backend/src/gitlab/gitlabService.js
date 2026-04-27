@@ -339,3 +339,76 @@ export const getDiffRefsWithRetry = async (
 
   return null;
 };
+
+/**
+ * List files in the repository
+ * @param {string} token - GitLab API token
+ * @param {string|number} projectId - Project ID
+ * @param {object} options - { ref, path, recursive }
+ */
+/**
+ * List all files in the repository tree recursively.
+ * Handles GitLab's pagination by looping through pages until all files are fetched.
+ * Supports a safety cap of 2000 files to prevent performance issues on massive repos.
+ */
+export const listRepositoryFiles = async (token, projectId, options = {}) => {
+  const { ref = "main", path = "", recursive = true } = options;
+  const allFiles = [];
+  let page = 1;
+  const perPage = 100;
+  const maxFiles = 2000; // Safety cap
+
+  try {
+    while (allFiles.length < maxFiles) {
+      const response = await client(token).get(
+        `/projects/${projectId}/repository/tree`,
+        {
+          params: {
+            ref,
+            path,
+            recursive,
+            per_page: perPage,
+            page: page,
+          },
+        },
+      );
+
+      const files = response.data;
+      if (!files || files.length === 0) break;
+
+      allFiles.push(...files);
+      
+      // If we got fewer than perPage, we've reached the end
+      if (files.length < perPage) break;
+      
+      page++;
+    }
+    
+    return allFiles;
+  } catch (error) {
+    console.error(`❌ Failed to list repository files: ${error.message}`);
+    return [];
+  }
+};
+
+/**
+ * Get raw file content from the repository
+ * @param {string} token - GitLab API token
+ * @param {string|number} projectId - Project ID
+ * @param {string} filePath - Path to the file
+ * @param {string} ref - Branch/Commit reference
+ */
+export const getRepositoryFile = async (token, projectId, filePath, ref = "main") => {
+  try {
+    const encodedPath = encodeURIComponent(filePath);
+    const response = await client(token).get(
+      `/projects/${projectId}/repository/files/${encodedPath}/raw`,
+      {
+        params: { ref },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    return null;
+  }
+};

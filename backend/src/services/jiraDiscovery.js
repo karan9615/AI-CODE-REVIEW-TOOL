@@ -17,22 +17,36 @@ export const jiraDiscovery = {
     const { title, source_branch, description } = mrData;
     const { threshold = 0.5, matchCount = 1 } = options;
 
-    // 1. Try Regex Pattern Matching (Priority)
+    logger.info(`🔍 Discovering Jira ticket for MR: "${title}"`);
+
+    // 1. Try Regex Pattern Matching (Highest Priority)
     const ticketId =
       this.extractId(title) ||
       this.extractId(source_branch) ||
       this.extractId(description);
 
     if (ticketId) {
+      logger.info(`🎯 Found Jira ID in text: ${ticketId}`);
       return await this.getTicketById(ticketId);
     }
 
-    // 2. Semantic Search Fallback
+    logger.info(`🕵️ No explicit Jira ID found. Attempting semantic search...`);
+
+    // 2. Semantic Search Fallback (Vector Similarity via Supabase)
     if (!supabase) return null;
 
     // Use both title and branch for semantic search to maximize hit rate
     const searchQuery = `${title} ${source_branch || ""}`.trim();
-    return await this.searchBySimilarity(searchQuery, { threshold, matchCount });
+    const result = await this.searchBySimilarity(searchQuery, { threshold, matchCount });
+    
+    // Safety Guard: Only link if similarity is high (>= 75%)
+    // This prevents "contamination" where a project might match a similar-sounding ticket from a different project
+    if (result && result.similarity < 0.75) {
+      logger.info(`⚠️ Closest Jira match only has ${Math.round(result.similarity * 100)}% similarity. Ignoring to avoid contamination.`);
+      return null;
+    }
+
+    return result;
   },
 
   /**
@@ -62,6 +76,7 @@ export const jiraDiscovery = {
       // Join all chunks to provide the full description and comments
       const fullContent = data.map((d) => d.content_chunk).join("\n\n---\n\n");
 
+      logger.info(`🔗 Linked Jira Context: ${data[0].ticket_key}`);
       return {
         key: data[0].ticket_key,
         content: fullContent,
@@ -72,51 +87,41 @@ export const jiraDiscovery = {
   },
 
   /**
-   * Perform vector search in Supabase
+   * Perform vector search in Supabase using embeddings.
+   * Only searches within the detected project key to ensure isolation.
    */
   async searchBySimilarity(query, { threshold, matchCount }) {
     try {
-      // 1. Determine Project Key (Prefix) from query if possible
-      const extractedKey = this.extractProjectKey(query);
-      const projectsToSearch = extractedKey ? [extractedKey] : ["RAPTOR", "CERA", "DEVOPS"];
-
-      // Generate embedding for the search query
-      const queryEmbedding = await AIService.embed(query, "huggingface");
-
-      for (const projectKey of projectsToSearch) {
-        // 2. Call the Supabase RPC function (match_ticket_embeddings)
-        const { data, error } = await supabase.rpc("match_ticket_embeddings", {
-          query_embedding: queryEmbedding,
-          match_threshold: threshold,
-          match_count: matchCount,
-          filter_env_id: "Birdseyeview",
-          filter_project_key: projectKey,
-        });
-
-        if (error) continue;
-
-        if (data && data.length > 0) {
-          const bestMatch = data[0];
-          return await this.getTicketById(bestMatch.ticket_key);
-        }
+      // 1. Identify the project prefix (e.g., "CERA")
+      const projectKey = this.extractProjectKey(query);
+      if (!projectKey) {
+        logger.info(`ℹ️ No Jira project key detected in MR metadata. Skipping semantic search to prevent contamination.`);
+        return null;
       }
 
-      // 3. Last resort: Global search without project filter if we haven't found anything
-      const { data: globalData, error: globalError } = await supabase.rpc("match_ticket_embeddings", {
+      // 2. Generate embedding for the search query
+      const queryEmbedding = await AIService.embed(query, "huggingface");
+
+      // 3. Search ONLY within the identified project
+      const { data, error } = await supabase.rpc("match_ticket_embeddings", {
         query_embedding: queryEmbedding,
         match_threshold: threshold,
         match_count: matchCount,
-        filter_env_id: "Birdseyeview",
-        // No project filter here
+        filter_project_key: projectKey, // Strictly filter by project
       });
 
-      if (!globalError && globalData && globalData.length > 0) {
-        const bestMatch = globalData[0];
-        return await this.getTicketById(bestMatch.ticket_key);
+      if (!error && data && data.length > 0) {
+        const bestMatch = data[0];
+        const ticket = await this.getTicketById(bestMatch.ticket_key);
+        return {
+          ...ticket,
+          similarity: bestMatch.similarity
+        };
       }
 
       return null;
-    } catch (err) {
+    } catch (error) {
+      logger.error(`❌ Semantic search failed: ${error.message}`);
       return null;
     }
   },

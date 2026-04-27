@@ -5,6 +5,7 @@ import {
   formatDescriptionToMarkdown,
 } from "../review/reviewService.js";
 import { jiraDiscovery } from "./jiraDiscovery.js";
+import { repoDiscovery } from "./repoDiscovery.js";
 import logger from "../utils/logger.js";
 
 /**
@@ -169,8 +170,19 @@ export const mrService = {
 
     logger.info(`Fetched ${mrDiffs.length} diffs for inline review`);
 
+    // Step 4.5: Fetch Global Repository Context (Configs, MD files, and Connected Files)
+    let repoContext = { configs: {}, docs: [], connected: {} };
+    try {
+      logger.info(`🛰️ Starting Repo Discovery for project ${projectId}...`);
+      const changedPaths = mrDiffs.map(d => d.new_path);
+      repoContext = await repoDiscovery.getRepoContext(token, projectId, head_sha, changedPaths, mrDiffs);
+      logger.info(`✅ Repo Context gathered successfully.`);
+    } catch (err) {
+      logger.warn(`Repo discovery failed: ${err.message}`);
+    }
+
     // Step 6: Generate AI review comments
-    const comments = await generateInlineReviews(model, mrDiffs, [], apiKey, projectContext, jiraContext);
+    const comments = await generateInlineReviews(model, mrDiffs, [], apiKey, projectContext, jiraContext, repoContext);
     logger.info(`Generated ${comments.length} inline comments`);
 
     // Step 7: Post inline comments (with error handling per comment)
@@ -275,10 +287,20 @@ export const mrService = {
     }
 
     const { base_sha, start_sha, head_sha } = diffRefs;
-
     // Step 3: Fetch MR diffs
     const mrDiffs = await gl.getDiffs(token, projectId, mrIid);
     logger.info(`Fetched ${mrDiffs.length} diffs for MR #${mrIid}`);
+
+    // Step 2.5: Fetch Global Repository Context (Configs, MD files, and Connected Files)
+    let repoContext = { configs: {}, docs: [], connected: {} };
+    try {
+      logger.info(`🛰️ Starting Repo Discovery for project ${projectId}...`);
+      const changedPaths = mrDiffs.map(d => d.new_path);
+      repoContext = await repoDiscovery.getRepoContext(token, projectId, head_sha, changedPaths, mrDiffs);
+      logger.info(`✅ Repo Context gathered successfully.`);
+    } catch (err) {
+      logger.warn(`Repo discovery failed: ${err.message}`);
+    }
 
     if (!mrDiffs || mrDiffs.length === 0) {
       throw new Error("No diffs found for this merge request");
@@ -330,6 +352,29 @@ export const mrService = {
       logger.warn(`Jira discovery failed during existing MR review: ${err.message}`);
     }
 
+    // Step 4.8: Improve MR Title and Description
+    try {
+      logger.info(`📝 Improving MR title and description for MR #${mrIid}...`);
+      const { title, description } = await generateMRContent(
+        model,
+        mrDiffs,
+        apiKey,
+        projectContext,
+        jiraContext,
+        repoContext,
+      );
+
+      const formattedDesc = formatDescriptionToMarkdown(description);
+
+      await gl.updateMR(token, projectId, mrIid, {
+        title,
+        description: formattedDesc,
+      });
+      logger.info(`✅ MR title and description updated.`);
+    } catch (err) {
+      logger.warn(`Failed to update MR description: ${err.message}`);
+    }
+
     // Step 5: Generate AI reviews
     let comments = await generateInlineReviews(
       model,
@@ -338,6 +383,7 @@ export const mrService = {
       apiKey,
       projectContext,
       jiraContext,
+      repoContext,
     );
     logger.info(
       `Generated ${comments.length} inline comments (AI aware of ${existingCommentsForAI.length} existing)`,
@@ -364,12 +410,47 @@ export const mrService = {
       };
     }
 
-    // Step 5: Post comments
+    // Step 5: Deduplicate comments against existing ones (Semantic Fingerprint)
+    // We use an "aggressive" filter to prevent the AI from re-posting similar feedback.
+    const filteredComments = comments.filter((comment) => {
+      const targetLine = comment.line || comment.oldLine;
+      
+      // 5.1 Create a "fingerprint" of the issue (lowercase, no special characters)
+      const newFingerprint = comment.issue?.toLowerCase().replace(/[^a-z0-9]/g, "") || "";
+
+      const isDuplicate = existingCommentsForAI.some((existing) => {
+        const sameFile = existing.filePath === comment.filePath;
+        
+        // 5.2 Check for line proximity (Allow 1-line margin of error/offset)
+        const sameLine = Math.abs(existing.line - targetLine) <= 1;
+        
+        // 5.3 Semantic Content Match: Does the existing comment look like the same issue?
+        // We check if the new issue text is contained within the existing preview or vice versa.
+        const existingFingerprint = existing.preview.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const contentMatch = existingFingerprint.includes(newFingerprint) || newFingerprint.includes(existingFingerprint);
+
+        return sameFile && (sameLine || contentMatch);
+      });
+
+      if (isDuplicate) {
+        logger.info(
+          `🚫 Suppressing duplicate/similar comment on ${comment.filePath}:${targetLine}`,
+        );
+        return false;
+      }
+      return true;
+    });
+
+    logger.info(
+      `After aggressive deduplication, ${filteredComments.length}/${comments.length} comments will be posted.`,
+    );
+
+    // Step 6: Post comments
     const result = await this._postComments(
       token,
       projectId,
       mrIid,
-      comments,
+      filteredComments,
       mrDiffs,
       { base_sha, start_sha, head_sha },
     );

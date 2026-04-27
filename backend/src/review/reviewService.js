@@ -26,7 +26,7 @@ function loadRules() {
 /**
  * Generate MR title + description
  */
-export async function generateMRContent(model, diffs, apiKey = null, projectContext = "", jiraContext = "") {
+export async function generateMRContent(model, diffs, apiKey = null, projectContext = "", jiraContext = "", repoContext = {}) {
   const rules = loadRules();
 
   const contextString = projectContext 
@@ -37,10 +37,27 @@ export async function generateMRContent(model, diffs, apiKey = null, projectCont
     ? `\n## JIRA BUSINESS CONTEXT (Requirements)\nThe following requirements were found for this feature in Jira. You MUST prioritize validating the code against these Acceptance Criteria and business logic:\n${jiraContext}\n`
     : "";
 
+  // Build Repository Context String
+  let repoContextStr = "";
+  if (repoContext.configs && Object.keys(repoContext.configs).length > 0) {
+    repoContextStr += "\n## REPOSITORY CONFIGURATION\n";
+    for (const [filename, content] of Object.entries(repoContext.configs)) {
+      repoContextStr += `### ${filename}\n\`\`\`\n${content}\n\`\`\`\n`;
+    }
+  }
+
+  if (repoContext.docs && repoContext.docs.length > 0) {
+    repoContextStr += "\n## REPOSITORY STANDARDS & ARCHITECTURE\n";
+    repoContext.docs.forEach(doc => {
+      repoContextStr += `### ${doc.path}\n${doc.content}\n\n`;
+    });
+  }
+
   const prompt = `You are a Senior Software Engineer reviewing a GitLab Merge Request.
 ${contextString}
 ${jiraContextString}
-Your job is to generate a PRODUCTION-READY, ACCURATE Merge Request title and description based ONLY on the provided code diffs. Use the JIRA BUSINESS CONTEXT to understand the "WHY" behind the changes. Do NOT invent or assume context that is not present in the diffs or Jira context.
+${repoContextStr}
+Your job is to generate a PRODUCTION-READY, ACCURATE Merge Request title and description based ONLY on the provided code diffs. Use the JIRA BUSINESS CONTEXT to understand the "WHY" behind the changes and the REPOSITORY CONFIGURATION/STANDARDS to ensure architectural compliance.
 
 ## Title (max 72 chars)
 - Start with a strong verb (Fix, Add, Improve, Refactor, Remove, Update)
@@ -100,54 +117,60 @@ ${JSON.stringify(diffs, null, 2)}
 }
 
 /**
- * Converts a structured description object (from AI) into a clean Markdown string
+ * Format the AI-generated MR content into structured Markdown for GitLab.
+ * Handles case-insensitivity in AI JSON keys (e.g., "Summary" vs "summary") 
+ * and maps them to beautiful, consistent GitLab sections with icons.
  */
 export function formatDescriptionToMarkdown(data) {
   let parsedData = data;
   
-  // If it's a string that looks like JSON, try to parse it first
+  // 1. Attempt to parse if AI returned a stringified JSON block
   if (typeof data === 'string' && (data.trim().startsWith('{') || data.trim().startsWith('['))) {
     try {
       parsedData = JSON.parse(data);
     } catch (e) {
-      // Not valid JSON, keep as string
+      return data; // Fallback to raw text if parsing fails
     }
   }
 
   if (typeof parsedData !== "object" || parsedData === null) return String(parsedData);
 
-  const d = parsedData;
+  // 2. Normalize keys to lowercase_snake_case for robust matching
+  const d = {};
+  Object.keys(parsedData).forEach(key => {
+    const normalizedKey = key.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
+    d[normalizedKey] = parsedData[key];
+  });
+
   let markdown = "";
 
-  // 1. Summary Section
-  if (d.summary) {
-    markdown += "### Summary\n";
-    if (Array.isArray(d.summary)) {
-      d.summary.forEach((item) => (markdown += `- ${item}\n`));
+  const summary = d.summary || d.mr_summary || d.overview || d.description;
+  if (summary) {
+    markdown += "### 📝 Summary\n";
+    if (Array.isArray(summary)) {
+      summary.forEach((item) => (markdown += `${item.startsWith('-') ? '' : '- '}${item}\n`));
     } else {
-      markdown += `${d.summary}\n`;
+      markdown += `${summary}\n`;
     }
     markdown += "\n";
   }
 
-  // 2. Key Changes Section
-  if (d.key_changes || d.keyChanges) {
-    const changes = d.key_changes || d.keyChanges;
-    markdown += "### Key Changes\n";
+  const changes = d.key_changes || d.keychanges || d.changes || d.features;
+  if (changes) {
+    markdown += "### 🚀 Key Changes\n";
     if (Array.isArray(changes)) {
-      changes.forEach((item) => (markdown += `- ${item}\n`));
+      changes.forEach((item) => (markdown += `${item.startsWith('-') ? '' : '- '}${item}\n`));
     } else {
       markdown += `${changes}\n`;
     }
     markdown += "\n";
   }
 
-  // 3. Risks & Considerations
-  if (d.risks_considerations || d.risks) {
-    const risks = d.risks_considerations || d.risks;
-    markdown += "### Risks & Considerations\n";
+  const risks = d.risks_considerations || d.risks || d.risk_assessment || d.considerations;
+  if (risks) {
+    markdown += "### ⚠️ Risks / Considerations\n";
     if (Array.isArray(risks)) {
-      risks.forEach((item) => (markdown += `- ${item}\n`));
+      risks.forEach((item) => (markdown += `${item.startsWith('-') ? '' : '- '}${item}\n`));
     } else {
       markdown += `${risks}\n`;
     }
@@ -155,14 +178,15 @@ export function formatDescriptionToMarkdown(data) {
   }
 
   // 4. Testing Notes
-  if (d.testing_notes || d.testing) {
-    const testing = d.testing_notes || d.testing;
-    markdown += "### Testing Notes\n";
+  const testing = d.testing_notes || d.testing || d.verification;
+  if (testing) {
+    markdown += "### 🧪 Testing Notes\n";
     if (Array.isArray(testing)) {
-      testing.forEach((item) => (markdown += `- ${item}\n`));
+      testing.forEach((item) => (markdown += `${item.startsWith('-') ? '' : '- '}${item}\n`));
     } else {
       markdown += `${testing}\n`;
     }
+    markdown += "\n";
   }
 
   return markdown.trim() || JSON.stringify(d, null, 2);
@@ -480,11 +504,39 @@ export async function generateInlineReviews(
   apiKey = null,
   projectContext = "",
   jiraContext = "",
+  repoContext = { configs: {}, docs: [], connected: {} },
 ) {
+  // Construct Repository Context sections
+  let configsStr = "";
+  let docsStr = "";
+  let connectedStr = "";
+
+  if (repoContext.configs) {
+    for (const [filename, content] of Object.entries(repoContext.configs)) {
+      configsStr += `\n### Configuration: ${filename}\n\`\`\`\n${content}\n\`\`\`\n`;
+    }
+  }
+
+  if (repoContext.docs) {
+    for (const doc of repoContext.docs) {
+      docsStr += `\n### Documentation: ${doc.path}\n${doc.content}\n`;
+    }
+  }
+
+  if (repoContext.connected && Object.keys(repoContext.connected).length > 0) {
+    for (const [path, content] of Object.entries(repoContext.connected)) {
+      connectedStr += `\n### File: ${path}\n\`\`\`\n${content}\n\`\`\`\n`;
+    }
+  }
+
+  if (configsStr || docsStr || connectedStr) {
+    logger.info(`🧠 AI Prompt enriched with repository standards and connected files.`);
+  }
+
   const enrichedDiffs = buildEnrichedDiffs(diffs);
   const rules = loadRules();
 
-  // 1. Generate Global Context
+  // 1. Generate Global Context for the AI to understand the scope
   const globalFileContext = enrichedDiffs
     .map(
       (d) =>
@@ -502,10 +554,24 @@ export async function generateInlineReviews(
 
   const prompt = `
 You are a **Senior Software Engineer** doing a critical code review for a GitLab Merge Request for production deployment.
+
 ${contextString}
 ${jiraContextString}
+
+# CROSS-FILE REFERENCE RESOLUTION (Crucial Context)
+The following code from other files in the repository is imported by the changes you are reviewing. 
+**You MUST use these definitions to resolve the values of constants (e.g., SCHEDULE_STATUS_MAP), enums, and methods before flagging any "misalignments" or "undefined" errors.**
+${connectedStr}
+
+# REPOSITORY ARCHITECTURE & STANDARDS
+${configsStr}
+${docsStr}
+
 # MISSION
-Perform a deep technical code review focused on system integrity and efficiency. Your goal is to identify:
+Perform a deep technical code review focused on system integrity and efficiency. 
+Before flagging a "misalignment" with Jira requirements, check the **CROSS-FILE REFERENCE RESOLUTION** section. 
+**Important**: Many constant values (e.g., STATUS.COMPLETED) are mapped to human-readable strings (e.g., "Ready to Run") in these files. Use these mappings to validate against the Jira requirements.
+focused on system integrity and efficiency. Your goal is to identify:
 1. **Bugs & Logical Flaws**: Any code that will fail under certain conditions or produce incorrect results.
 2. **Optimization**: Areas where resource usage (CPU, Memory, Network, DB) can be significantly improved.
 3. **Scalability**: Code that works for now but will fail or slow down as data volume or user count increases.
