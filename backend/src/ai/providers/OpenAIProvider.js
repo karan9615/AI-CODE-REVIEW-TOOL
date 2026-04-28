@@ -27,6 +27,29 @@ export class OpenAIProvider {
   }
 
   /**
+   * List available models from OpenAI
+   */
+  async listModels(apiKey = null) {
+    const client = apiKey ? new OpenAI({ apiKey }) : this.client;
+    if (!client) return [];
+
+    try {
+      const response = await client.models.list();
+      return response.data
+        .filter((m) => m.id.includes("gpt-"))
+        .map((m) => ({
+          key: m.id,
+          label: `${m.id} (OpenAI)`,
+          provider: "openai",
+          config: { model: m.id },
+        }));
+    } catch (error) {
+      console.error("OpenAI listModels error:", error.message);
+      return [];
+    }
+  }
+
+  /**
    * Generate completion using OpenAI models
    * @param {string} prompt - The prompt to send
    * @param {Object} config - Model configuration
@@ -92,6 +115,37 @@ export class OpenAIProvider {
     } catch (error) {
       console.error(`OpenAI API Error (${model}):`, error.message);
       throw new Error(`OpenAI generation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate embedding for text
+   * @param {string} text - The text to embed
+   * @param {Object} config - Configuration (model)
+   * @returns {Promise<Array<number>>} The embedding vector
+   */
+  async embed(text, config = {}) {
+    const { apiKey, model = "text-embedding-3-small" } = config;
+    let client = this.client;
+
+    if (apiKey) {
+      client = new OpenAI({ apiKey });
+    }
+
+    if (!client) {
+      throw new Error("OpenAI provider not configured.");
+    }
+
+    try {
+      const response = await client.embeddings.create({
+        model,
+        input: text,
+      });
+
+      return response.data[0].embedding;
+    } catch (error) {
+      console.error(`OpenAI Embedding Error (${model}):`, error.message);
+      throw new Error(`OpenAI embedding failed: ${error.message}`);
     }
   }
 }

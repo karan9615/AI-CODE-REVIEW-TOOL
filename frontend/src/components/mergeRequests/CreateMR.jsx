@@ -164,6 +164,11 @@ export function CreateMR({ project }) {
                     {success.message || "Merge Request Created"}
                   </h3>
                   <div className="text-surface-muted mb-6 flex flex-col gap-2">
+                    {success.jiraTicket && (
+                      <div className="mx-auto flex items-center gap-2 px-3 py-1 bg-green-500/10 text-green-400 rounded-full text-xs font-bold border border-green-500/20 mb-2">
+                        🔗 Linked Jira Ticket: {success.jiraTicket.key}
+                      </div>
+                    )}
                     {success.comments?.skipped ? (
                       <Alert type="warning">
                         {success.comments.reason || "AI comments were skipped — diff refs not ready yet. View the MR in GitLab to retry manually."}

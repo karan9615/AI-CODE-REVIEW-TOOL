@@ -2,7 +2,9 @@ import * as gl from "../gitlab/gitlabService.js";
 import {
   generateMRContent,
   generateInlineReviews,
+  formatDescriptionToMarkdown,
 } from "../review/reviewService.js";
+import { jiraDiscovery } from "./jiraDiscovery.js";
 import logger from "../utils/logger.js";
 
 /**
@@ -68,17 +70,35 @@ export const mrService = {
 
     logger.info(`Found ${diffs.length} file changes`);
 
-    // Step 2: Generate MR title and description using AI
+    // Step 2: Discover Jira Context
+    let jiraContext = "";
+    let linkedTicket = null;
+    try {
+      const ticket = await jiraDiscovery.findTicket({
+        title: source_branch, // Often branch has the ID
+        source_branch,
+        description: "", // New MR, no desc yet
+      });
+      if (ticket) {
+        jiraContext = ticket.content;
+        linkedTicket = { key: ticket.key };
+      }
+    } catch (err) {
+      logger.warn(`Failed to discover Jira ticket: ${err.message}`);
+    }
+
+    // Step 3: Generate MR title and description using AI
     const { title, description } = await generateMRContent(
       model,
       diffs,
       apiKey,
       projectContext,
+      jiraContext,
     );
     logger.info(`Generated MR title: ${title}`);
 
     // Step 3: Create the Merge Request
-    const created = await gl.createMR(token, projectId, {
+    const mrPayload = {
       source_branch,
       target_branch,
       title,
@@ -86,7 +106,12 @@ export const mrService = {
       assignee_id,
       reviewer_ids,
       remove_source_branch,
-    });
+    };
+
+    // Ensure description is a string and not empty (Format if it's an object or JSON string)
+    mrPayload.description = formatDescriptionToMarkdown(description);
+    
+    const created = await gl.createMR(token, projectId, mrPayload);
 
     logger.info(`Created MR #${created.iid}`);
 
@@ -145,7 +170,7 @@ export const mrService = {
     logger.info(`Fetched ${mrDiffs.length} diffs for inline review`);
 
     // Step 6: Generate AI review comments
-    const comments = await generateInlineReviews(model, mrDiffs, [], apiKey, projectContext);
+    const comments = await generateInlineReviews(model, mrDiffs, [], apiKey, projectContext, jiraContext);
     logger.info(`Generated ${comments.length} inline comments`);
 
     // Step 7: Post inline comments (with error handling per comment)
@@ -162,6 +187,7 @@ export const mrService = {
       success: true,
       iid: created.iid,
       web_url: created.web_url,
+      jiraTicket: linkedTicket,
       comments: result,
     };
   },
@@ -177,13 +203,33 @@ export const mrService = {
       throw new Error("No changes found in this merge request");
     }
 
+    // Discover Jira Context (Using the same robust logic as Review)
+    let jiraContext = "";
+    try {
+      const mrDetails = await gl.getMRDetails(token, projectId, mrIid);
+      const ticket = await jiraDiscovery.findTicket({
+        title: mrDetails.title,
+        source_branch: mrDetails.source_branch,
+        description: mrDetails.description,
+      });
+      if (ticket) {
+        jiraContext = ticket.content;
+      }
+    } catch (err) {
+      logger.warn(`Jira discovery failed during update: ${err.message}`);
+    }
+
     // Generate new content
-    const { title, description } = await generateMRContent(
+    let { title, description } = await generateMRContent(
       model,
       diffs,
       apiKey,
       projectContext,
+      jiraContext,
     );
+
+    // Format description if it's an object or JSON string (common with Mistral)
+    description = formatDescriptionToMarkdown(description);
 
     logger.info(`Generated new title: ${title}`);
 
@@ -266,6 +312,24 @@ export const mrService = {
       );
     }
 
+    // Step 4.5: Discover Jira Context (RAG)
+    let jiraContext = "";
+    let linkedTicket = null;
+    try {
+      const ticket = await jiraDiscovery.findTicket({
+        title: mrDetails.title,
+        source_branch: mrDetails.source_branch,
+        description: mrDetails.description,
+      });
+
+      if (ticket) {
+        jiraContext = ticket.content;
+        linkedTicket = { key: ticket.key };
+      }
+    } catch (err) {
+      logger.warn(`Jira discovery failed during existing MR review: ${err.message}`);
+    }
+
     // Step 5: Generate AI reviews
     let comments = await generateInlineReviews(
       model,
@@ -273,6 +337,7 @@ export const mrService = {
       existingCommentsForAI,
       apiKey,
       projectContext,
+      jiraContext,
     );
     logger.info(
       `Generated ${comments.length} inline comments (AI aware of ${existingCommentsForAI.length} existing)`,
@@ -312,6 +377,7 @@ export const mrService = {
     return {
       success: true,
       iid: mrIid,
+      jiraTicket: linkedTicket,
       comments: result,
     };
   },

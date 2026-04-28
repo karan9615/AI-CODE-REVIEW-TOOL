@@ -5,6 +5,7 @@ import { useToast } from "../context/ToastContext";
 export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
+  const [aiProvider, setAiProvider] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const hasCheckedSession = useRef(false);
@@ -23,12 +24,15 @@ export const useAuth = () => {
       const data = await api("/auth/check", {}, "GET");
       if (data.authenticated) {
         setIsAuthenticated(true);
+        setAiProvider(data.aiProvider);
       } else {
         setIsAuthenticated(false);
+        setAiProvider(null);
       }
     } catch (e) {
       console.warn("Session check failed", e);
       setIsAuthenticated(false);
+      setAiProvider(null);
     } finally {
       setLoading(false);
     }
@@ -37,15 +41,16 @@ export const useAuth = () => {
   /* import useToast MUST be added at the top */
   const toast = useToast();
 
-  const login = async (token, apiKey) => {
+  const login = async (token, apiKey, provider) => {
     setLoading(true);
     setError(null);
     try {
-      const authResponse = await api("/auth/login", { token, apiKey });
+      const authResponse = await api("/auth/login", { token, apiKey, provider });
 
       if (authResponse.success) {
         setIsAuthenticated(true);
         setUser(authResponse.user);
+        setAiProvider(provider);
         toast.success("Successfully logged in!");
 
         return true;
@@ -72,7 +77,8 @@ export const useAuth = () => {
     }
     setIsAuthenticated(false);
     setUser(null);
+    setAiProvider(null);
   };
 
-  return { isAuthenticated, user, loading, error, login, logout, checkSession };
+  return { isAuthenticated, user, aiProvider, loading, error, login, logout, checkSession };
 };

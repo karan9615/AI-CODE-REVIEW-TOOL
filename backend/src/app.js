@@ -70,7 +70,12 @@ app.use(
       const allowedOrigin = normalizeUrl(envConfig.clientUrl);
       const requestOrigin = normalizeUrl(origin);
 
-      if (requestOrigin === allowedOrigin) {
+      // Allow localhost and 127.0.0.1 automatically in development
+      const isLocalhost = 
+        requestOrigin.includes("localhost") || 
+        requestOrigin.includes("127.0.0.1");
+
+      if (requestOrigin === allowedOrigin || (envConfig.nodeEnv === "development" && isLocalhost)) {
         callback(null, true);
       } else {
         console.warn(

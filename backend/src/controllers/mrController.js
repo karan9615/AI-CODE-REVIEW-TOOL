@@ -46,8 +46,8 @@ export const createMR = async (req, res) => {
       });
     }
 
-    // Extract custom AI API key from session (Secure Cookie) or headers (optional fallback)
-    const customApiKey = req.session?.apiKey || req.headers["x-ai-api-key"];
+    // Extract custom AI API key from session (Secure Cookie)
+    const customApiKey = req.session?.aiConfig?.apiKey || req.headers["x-ai-api-key"];
 
     // Call service layer for business logic
     const result = await mrService.createAndReviewMR(
@@ -99,8 +99,8 @@ export const reviewMR = async (req, res) => {
       });
     }
 
-    // Extract custom AI API key from session (Secure Cookie) or headers (optional fallback)
-    const customApiKey = req.session?.apiKey || req.headers["x-ai-api-key"];
+    // Extract custom AI API key from session (Secure Cookie)
+    const customApiKey = req.session?.aiConfig?.apiKey || req.headers["x-ai-api-key"];
 
     // Call service layer
     const result = await mrService.reviewExistingMR(
@@ -134,7 +134,7 @@ export const updateMRContent = async (req, res) => {
       });
     }
 
-    const customApiKey = req.session?.apiKey || req.headers["x-ai-api-key"];
+    const customApiKey = req.session?.aiConfig?.apiKey || req.headers["x-ai-api-key"];
 
     const result = await mrService.updateMRContent(
       token,

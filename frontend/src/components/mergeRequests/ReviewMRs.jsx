@@ -230,11 +230,18 @@ export function ReviewMRs({ project }) {
                     >
                       <Alert type="success">
                         <div className="flex flex-col gap-1">
-                          <span className="font-bold">
-                            {actionType === "review"
-                              ? `Review Complete for MR #${reviewSuccess.iid}`
-                              : `Enhancement Complete for MR #${reviewSuccess.iid}`}
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold">
+                              {actionType === "review"
+                                ? `Review Complete for MR #${reviewSuccess.iid}`
+                                : `Enhancement Complete for MR #${reviewSuccess.iid}`}
+                            </span>
+                            {reviewSuccess.jiraTicket && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-green-500/10 text-green-400 rounded-full text-xs font-bold border border-green-500/20">
+                                🔗 {reviewSuccess.jiraTicket.key}
+                              </div>
+                            )}
+                          </div>
                           <span className="text-sm opacity-90">
                             {actionType === "review" ? (
                               reviewSuccess.comments?.posted > 0 ? (

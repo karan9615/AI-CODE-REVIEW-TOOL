@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { runAI } from "../ai/aiRouter.js";
 import { mrContentSchema, inlineReviewSchema } from "./reviewSchemas.js";
+import logger from "../utils/logger.js";
 
 // Cache rules to avoid repeated file reads
 let cachedRules = null;
@@ -25,16 +26,21 @@ function loadRules() {
 /**
  * Generate MR title + description
  */
-export async function generateMRContent(model, diffs, apiKey = null, projectContext = "") {
+export async function generateMRContent(model, diffs, apiKey = null, projectContext = "", jiraContext = "") {
   const rules = loadRules();
 
   const contextString = projectContext 
     ? `\n## PROJECT CONTEXT & GUIDELINES\nThe user has provided the following specific rules for this repository. You MUST adhere to these rules when analyzing the code:\n${projectContext}\n` 
     : "";
 
+  const jiraContextString = jiraContext
+    ? `\n## JIRA BUSINESS CONTEXT (Requirements)\nThe following requirements were found for this feature in Jira. You MUST prioritize validating the code against these Acceptance Criteria and business logic:\n${jiraContext}\n`
+    : "";
+
   const prompt = `You are a Senior Software Engineer reviewing a GitLab Merge Request.
 ${contextString}
-Your job is to generate a PRODUCTION-READY, ACCURATE Merge Request title and description based ONLY on the provided code diffs. Do NOT invent or assume context that is not present in the diffs.
+${jiraContextString}
+Your job is to generate a PRODUCTION-READY, ACCURATE Merge Request title and description based ONLY on the provided code diffs. Use the JIRA BUSINESS CONTEXT to understand the "WHY" behind the changes. Do NOT invent or assume context that is not present in the diffs or Jira context.
 
 ## Title (max 72 chars)
 - Start with a strong verb (Fix, Add, Improve, Refactor, Remove, Update)
@@ -67,17 +73,99 @@ ${JSON.stringify(diffs, null, 2)}
 `;
 
   try {
-    return await runAI(model, prompt, {
+    const result = await runAI(model, prompt, {
       responseSchema: mrContentSchema,
       apiKey,
     });
+
+    logger.info(`✨ AI Generated Content for MR: "${result.title}"`);
+    
+    // Safety check: Some models might return an object for description instead of a string
+    if (result.description && typeof result.description !== 'string') {
+      result.description = formatDescriptionToMarkdown(result.description);
+    }
+
+    if (!result.description) {
+      logger.warn("⚠️ AI returned an empty description!");
+    }
+
+    return result;
   } catch (error) {
-    console.error("❌ MR Content Generation Failed:", error.message);
+    logger.error("❌ MR Content Generation Failed:", error.message);
     return {
       title: "MR content create changes",
       description: "AI review failed to generate content.",
     };
   }
+}
+
+/**
+ * Converts a structured description object (from AI) into a clean Markdown string
+ */
+export function formatDescriptionToMarkdown(data) {
+  let parsedData = data;
+  
+  // If it's a string that looks like JSON, try to parse it first
+  if (typeof data === 'string' && (data.trim().startsWith('{') || data.trim().startsWith('['))) {
+    try {
+      parsedData = JSON.parse(data);
+    } catch (e) {
+      // Not valid JSON, keep as string
+    }
+  }
+
+  if (typeof parsedData !== "object" || parsedData === null) return String(parsedData);
+
+  const d = parsedData;
+  let markdown = "";
+
+  // 1. Summary Section
+  if (d.summary) {
+    markdown += "### Summary\n";
+    if (Array.isArray(d.summary)) {
+      d.summary.forEach((item) => (markdown += `- ${item}\n`));
+    } else {
+      markdown += `${d.summary}\n`;
+    }
+    markdown += "\n";
+  }
+
+  // 2. Key Changes Section
+  if (d.key_changes || d.keyChanges) {
+    const changes = d.key_changes || d.keyChanges;
+    markdown += "### Key Changes\n";
+    if (Array.isArray(changes)) {
+      changes.forEach((item) => (markdown += `- ${item}\n`));
+    } else {
+      markdown += `${changes}\n`;
+    }
+    markdown += "\n";
+  }
+
+  // 3. Risks & Considerations
+  if (d.risks_considerations || d.risks) {
+    const risks = d.risks_considerations || d.risks;
+    markdown += "### Risks & Considerations\n";
+    if (Array.isArray(risks)) {
+      risks.forEach((item) => (markdown += `- ${item}\n`));
+    } else {
+      markdown += `${risks}\n`;
+    }
+    markdown += "\n";
+  }
+
+  // 4. Testing Notes
+  if (d.testing_notes || d.testing) {
+    const testing = d.testing_notes || d.testing;
+    markdown += "### Testing Notes\n";
+    if (Array.isArray(testing)) {
+      testing.forEach((item) => (markdown += `- ${item}\n`));
+    } else {
+      markdown += `${testing}\n`;
+    }
+  }
+
+  return markdown.trim() || JSON.stringify(d, null, 2);
 }
 
 /**
@@ -391,6 +479,7 @@ export async function generateInlineReviews(
   existingComments = [],
   apiKey = null,
   projectContext = "",
+  jiraContext = "",
 ) {
   const enrichedDiffs = buildEnrichedDiffs(diffs);
   const rules = loadRules();
@@ -407,11 +496,32 @@ export async function generateInlineReviews(
     ? `\n# PROJECT CONTEXT & RULES\nThe user has provided the following specific guidelines for this repository. You MUST enforce these rules heavily when reviewing the code:\n${projectContext}\n` 
     : "";
 
+  const jiraContextString = jiraContext
+    ? `\n# JIRA BUSINESS CONTEXT (Requirements)\nThe following Acceptance Criteria and requirements were found for this feature. You MUST prioritize checking if the implementation correctly follows these business rules:\n${jiraContext}\n`
+    : "";
+
   const prompt = `
 You are a **Senior Software Engineer** doing a critical code review for a GitLab Merge Request for production deployment.
 ${contextString}
+${jiraContextString}
 # MISSION
-Review the code changes below and ONLY generate actionable, specific comments that require the developer to update or improve the code. Do NOT add info comments, explanations, or compliments. Only comment if a real, actionable change is needed.
+Perform a deep technical code review focused on system integrity and efficiency. Your goal is to identify:
+1. **Bugs & Logical Flaws**: Any code that will fail under certain conditions or produce incorrect results.
+2. **Optimization**: Areas where resource usage (CPU, Memory, Network, DB) can be significantly improved.
+3. **Scalability**: Code that works for now but will fail or slow down as data volume or user count increases.
+4. **Technical Improvements**: Robustness enhancements like better error propagation, input validation, and type safety.
+
+Think step-by-step for each hunk:
+1. Could this fail? (Edge cases, nulls, race conditions)
+2. Is this inefficient? (N+1 queries, redundant loops, large memory allocations)
+3. Will this scale? (Complexity analysis, database locking, state management)
+4. Is there a technical gap? (Missing validation, weak error handling)
+
+# REVIEW PRINCIPLES
+- **Objective Only**: Only comment on technical issues. Do NOT suggest stylistic or subjective changes.
+- **Actionability**: Describe exactly what the technical risk is and provide a concrete fix.
+- **No Fluff**: Do NOT add compliments or general explanations.
+- **Strict Deduplication**: Only one comment per type of issue. If the same issue exists in multiple places, comment once and add: *"Note: Please check other parts of the PR as well, as this same issue may exist in multiple locations."*
 
 # GLOBAL CONTEXT (Full MR Overview)
 The following files are part of this Merge Request. Use this context to understand relationships between files, even if they are in different chunks:
@@ -460,17 +570,13 @@ ${globalFileContext}
 - Memory Inefficiency: Creating large objects in loops → Move allocation outside loop or use streaming
 
 ## 🟡 SEVERITY: "medium"
-**Code Quality**
-- Code Duplication: Same logic in 3+ places → Extract to shared utility function
-- Long Functions: >50 lines doing multiple things → Split into smaller, single-purpose functions
-- Magic Numbers: Hardcoded values without explanation → Define as named constants with comments
-- Deep Nesting: >3 levels of if/for/while → Use early returns or extract to functions
-
-**Maintainability**
-- Missing Error Context: throw new Error('Failed') → Include operation, input, and state in error message
-- Tight Coupling: Direct dependencies on concrete classes → Use dependency injection or interfaces
-- Unclear Naming: Variable names like 'data', 'temp', 'x' → Use descriptive names (userData, tempCache, userId)
-- No Validation: User input used directly → Add input validation with specific error messages
+**Optimization & Technical Improvements**
+- Inefficient Iteration: map/filter/find used redundantly → Combine or use standard loops
+- Dead Code: Unused imports, variables, or functions → Remove code that isn't being used
+- Redundant State: Derived values stored in state → Calculate on the fly or use useMemo
+- Missing Error Context: Exceptions thrown without input/state context → Include operational details in error message
+- No Validation: User input used directly in logic → Add input validation with specific error messages
+- Resource Cleanup: Missing cleanup in useEffect or event listeners → Add cleanup logic to prevent memory leaks
 
 # COMMENT STRUCTURE (BEST PRACTICES)
 
@@ -502,32 +608,28 @@ Note: Since you only have access to git diffs (not full codebase), you may not a
   "comment": "**Issue:** The \`count\` parameter is not validated before use.\\n\\n**Risk:** Passing negative or non-numeric values will cause runtime errors or unexpected behavior."
 }
 
-## Invalid Example:
-❌ Missing Issue section entirely
-❌ Generic comments without specifics
+## Duplicate Prevention:
+If the **exact same issue** (e.g., same logic error, same naming violation, same security flaw) occurs multiple times across different lines or files in this PR:
+1. **Comment only ONCE** at the first occurrence.
+2. At the end of the comment, add this EXACT text: *"Note: Please check other parts of the PR as well, as this same issue may exist in multiple locations."*
+3. **Do NOT** generate separate comment objects for the other occurrences.
 
 # RULES (STRICT ENFORCEMENT)
 
 ✅ DO:
 - ALWAYS include Issue section (mandatory)
-- Include Risk section when the impact is clear
-- Include Fix section with copy-pasteable code when you have enough context
-- Use double newlines (\\n\\n) between sections when including multiple
-- Comment ONLY on changed lines (added or deleted)
-- Reference actual line numbers from the diff
-- Focus on correctness, security, and performance
-- Include imports/dependencies in fix examples if needed
-- If you can't provide a complete Fix due to limited diff context, at least explain what needs to be done
-- **DEDUPLICATE CROSS-FILE ISSUES:** If the exact same issue (e.g., missing error handling, same typo) occurs in multiple files, make ONE comment on the first occurrence. Add a "**Similar issues found in:**" section listing the other file paths it applies to. Do not post separate comments for the duplicates.
+- **STRICTLY AVOID DUPLICATES**: Only one comment per type of issue. If the same issue exists in multiple places, comment once and add: *"Note: Please check other parts of the PR as well, as this same issue may exist in multiple locations."*
+- Use double newlines (\\n\\n) between sections.
+- Comment ONLY on changed lines (added or deleted).
+- Reference actual line numbers from the diff.
+- Focus on correctness, security, and performance.
 
-❌ DON'T:
-- Submit comments without Issue section
-- Make style suggestions (indentation, naming conventions handled by linters)
-- Add informational comments ("This looks good", "Consider adding...")
-- Suggest improvements without clear problems
-- Comment on unchanged context lines
-- Give vague advice ("improve error handling" without details)
-- Create duplicate comments for the exact same issue across different files. Use the 'Similar issues found in' pattern instead.
+❌ DO NOT:
+- Do NOT repeat the same feedback across different files or lines.
+- Do NOT add empty compliments (e.g. "Good job").
+- Do NOT comment on lines that haven't changed.
+- Do NOT give vague advice without specific details.
+- Do NOT create separate comment objects for the same issue found in multiple locations.
 
 # LANGUAGE-SPECIFIC CHECKS
 
@@ -676,7 +778,7 @@ ${JSON.stringify(chunk, null, 2)}
     let attempts = 0;
     let success = false;
 
-    while (attempts < 3 && !success) {
+    while (attempts < 5 && !success) {
       try {
         attempts++;
         const chunkComments = await runAI(model, chunkPrompt, {
@@ -692,16 +794,16 @@ ${JSON.stringify(chunk, null, 2)}
         }
       } catch (e) {
         console.error(
-          `❌ Error in chunk ${index + 1} (Attempt ${attempts}/3):`,
+          `❌ Error in chunk ${index + 1} (Attempt ${attempts}/5):`,
           e.message,
         );
 
-        // Smart handling for Rate Limits (429)
+        // Smart handling for Rate Limits (429) or High Demand (503)
         const isRateLimit =
-          e.message.includes("429") || e.message.includes("quota");
-        const baseBackoff = isRateLimit ? 5000 : 2000; // Wait longer for rate limits
+          e.message.includes("429") || e.message.includes("quota") || e.message.includes("503") || e.message.includes("demand");
+        const baseBackoff = isRateLimit ? 8000 : 3000; // Wait much longer for demand issues
 
-        if (attempts < 3) {
+        if (attempts < 5) {
           const backoff = baseBackoff * Math.pow(2, attempts - 1);
           console.log(`⏳ Waiting ${backoff}ms before retry...`);
           await new Promise((r) => setTimeout(r, backoff));
@@ -732,7 +834,17 @@ ${JSON.stringify(chunk, null, 2)}
   const validComments = comments
     .filter((comment) => validateCommentStructure(comment))
     .map((comment) => validateComment(comment, enrichedDiffs))
-    .filter(Boolean); // Removes nulls (e.g., binary files or missing files)
+    .filter(Boolean) // Removes nulls (e.g., binary files or missing files)
+    .filter((newComment) => {
+      const line = newComment.line || newComment.oldLine;
+      const isDuplicate = (existingComments || []).some((existing) => {
+        return existing.filePath === newComment.filePath && existing.line === line;
+      });
+      if (isDuplicate) {
+        return false;
+      }
+      return true;
+    });
 
   console.log(
     `✅ Validated ${validComments.length}/${comments.length} inline comments (structure + line numbers)`,
