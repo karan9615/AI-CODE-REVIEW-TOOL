@@ -26,11 +26,18 @@ function loadRules() {
 /**
  * Generate MR title + description
  */
-export async function generateMRContent(model, diffs, apiKey = null, projectContext = "", jiraContext = "", repoContext = {}) {
+export async function generateMRContent(
+  model,
+  diffs,
+  apiKey = null,
+  projectContext = "",
+  jiraContext = "",
+  repoContext = {}
+) {
   const rules = loadRules();
 
-  const contextString = projectContext 
-    ? `\n## PROJECT CONTEXT & GUIDELINES\nThe user has provided the following specific rules for this repository. You MUST adhere to these rules when analyzing the code:\n${projectContext}\n` 
+  const contextString = projectContext
+    ? `\n## PROJECT CONTEXT & GUIDELINES\nThe user has provided the following specific rules for this repository. You MUST adhere to these rules when analyzing the code:\n${projectContext}\n`
     : "";
 
   const jiraContextString = jiraContext
@@ -48,7 +55,7 @@ export async function generateMRContent(model, diffs, apiKey = null, projectCont
 
   if (repoContext.docs && repoContext.docs.length > 0) {
     repoContextStr += "\n## REPOSITORY STANDARDS & ARCHITECTURE\n";
-    repoContext.docs.forEach(doc => {
+    repoContext.docs.forEach((doc) => {
       repoContextStr += `### ${doc.path}\n${doc.content}\n\n`;
     });
   }
@@ -96,9 +103,9 @@ ${JSON.stringify(diffs, null, 2)}
     });
 
     logger.info(`✨ AI Generated Content for MR: "${result.title}"`);
-    
+
     // Safety check: Some models might return an object for description instead of a string
-    if (result.description && typeof result.description !== 'string') {
+    if (result.description && typeof result.description !== "string") {
       result.description = formatDescriptionToMarkdown(result.description);
     }
 
@@ -118,14 +125,14 @@ ${JSON.stringify(diffs, null, 2)}
 
 /**
  * Format the AI-generated MR content into structured Markdown for GitLab.
- * Handles case-insensitivity in AI JSON keys (e.g., "Summary" vs "summary") 
+ * Handles case-insensitivity in AI JSON keys (e.g., "Summary" vs "summary")
  * and maps them to beautiful, consistent GitLab sections with icons.
  */
 export function formatDescriptionToMarkdown(data) {
   let parsedData = data;
-  
+
   // 1. Attempt to parse if AI returned a stringified JSON block
-  if (typeof data === 'string' && (data.trim().startsWith('{') || data.trim().startsWith('['))) {
+  if (typeof data === "string" && (data.trim().startsWith("{") || data.trim().startsWith("["))) {
     try {
       parsedData = JSON.parse(data);
     } catch (e) {
@@ -135,57 +142,66 @@ export function formatDescriptionToMarkdown(data) {
 
   if (typeof parsedData !== "object" || parsedData === null) return String(parsedData);
 
-  // 2. Normalize keys to lowercase_snake_case for robust matching
-  const d = {};
-  Object.keys(parsedData).forEach(key => {
-    const normalizedKey = key.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
-    d[normalizedKey] = parsedData[key];
-  });
-
+  const d = parsedData;
   let markdown = "";
 
-  const summary = d.summary || d.mr_summary || d.overview || d.description;
+  /**
+   * Helper to find a value by case-insensitive key and fuzzy matching (removes spaces/underscores)
+   */
+  const getFuzzyValue = (obj, targetKeys) => {
+    const keys = Object.keys(obj);
+    const normalize = (k) => k.toLowerCase().trim().replace(/[^a-z0-9]+/g, "");
+    const normalizedTargetKeys = targetKeys.map(normalize);
+
+    const matchKey = keys.find((k) => normalizedTargetKeys.includes(normalize(k)));
+    return matchKey ? obj[matchKey] : null;
+  };
+
+  /**
+   * Helper to format items into a clean bullet list without double-bullets
+   */
+  const formatList = (items) => {
+    if (!items) return "";
+    if (Array.isArray(items)) {
+      return items
+        .map((item) => {
+          const cleanedItem = item.trim().startsWith("-") ? item.trim().substring(1).trim() : item.trim();
+          return `- ${cleanedItem}\n`;
+        })
+        .join("");
+    }
+    return `${items}\n`;
+  };
+
+  // 1. Summary Section
+  const summary = getFuzzyValue(d, ["summary", "mr_summary", "overview", "description"]);
   if (summary) {
     markdown += "### 📝 Summary\n";
-    if (Array.isArray(summary)) {
-      summary.forEach((item) => (markdown += `${item.startsWith('-') ? '' : '- '}${item}\n`));
-    } else {
-      markdown += `${summary}\n`;
-    }
+    markdown += formatList(summary);
     markdown += "\n";
   }
 
-  const changes = d.key_changes || d.keychanges || d.changes || d.features;
-  if (changes) {
+  // 2. Key Changes Section
+  const keyChanges = getFuzzyValue(d, ["key_changes", "keychanges", "changes", "features"]);
+  if (keyChanges) {
     markdown += "### 🚀 Key Changes\n";
-    if (Array.isArray(changes)) {
-      changes.forEach((item) => (markdown += `${item.startsWith('-') ? '' : '- '}${item}\n`));
-    } else {
-      markdown += `${changes}\n`;
-    }
+    markdown += formatList(keyChanges);
     markdown += "\n";
   }
 
-  const risks = d.risks_considerations || d.risks || d.risk_assessment || d.considerations;
+  // 3. Risks & Considerations
+  const risks = getFuzzyValue(d, ["risks_considerations", "risks", "risk_assessment", "considerations"]);
   if (risks) {
     markdown += "### ⚠️ Risks / Considerations\n";
-    if (Array.isArray(risks)) {
-      risks.forEach((item) => (markdown += `${item.startsWith('-') ? '' : '- '}${item}\n`));
-    } else {
-      markdown += `${risks}\n`;
-    }
+    markdown += formatList(risks);
     markdown += "\n";
   }
 
   // 4. Testing Notes
-  const testing = d.testing_notes || d.testing || d.verification;
+  const testing = getFuzzyValue(d, ["testing_notes", "testing", "verification"]);
   if (testing) {
     markdown += "### 🧪 Testing Notes\n";
-    if (Array.isArray(testing)) {
-      testing.forEach((item) => (markdown += `${item.startsWith('-') ? '' : '- '}${item}\n`));
-    } else {
-      markdown += `${testing}\n`;
-    }
+    markdown += formatList(testing);
     markdown += "\n";
   }
 
@@ -317,25 +333,15 @@ function validateCommentStructure(comment) {
   const hasFix = text.includes("**Fix:**");
 
   if (!hasIssue) {
-    console.warn(
-      `❌ Comment missing required Issue section on ${comment.filePath}:${
-        comment.line || comment.oldLine
-      }`,
-    );
+    console.warn(`❌ Comment missing required Issue section on ${comment.filePath}:${comment.line || comment.oldLine}`);
     console.warn(`   Comment preview: ${text.substring(0, 100)}...`);
     return false;
   }
 
   // Log warnings for missing optional sections
   if (!hasRisk || !hasFix) {
-    console.warn(
-      `⚠️  Comment has Issue but missing optional sections on ${
-        comment.filePath
-      }:${comment.line || comment.oldLine}`,
-    );
-    console.warn(
-      `   Missing: ${!hasRisk ? "Risk " : ""}${!hasFix ? "Fix" : ""}`,
-    );
+    console.warn(`⚠️  Comment has Issue but missing optional sections on ${comment.filePath}:${comment.line || comment.oldLine}`);
+    console.warn(`   Missing: ${!hasRisk ? "Risk " : ""}${!hasFix ? "Fix" : ""}`);
   }
 
   return true;
@@ -357,16 +363,13 @@ function validateComment(comment, enrichedDiffs) {
     return null;
   }
 
-  const { addedLines, deletedLines, contextNewLines, contextOldLines } =
-    createLineLookups(enrichedDiff);
+  const { addedLines, deletedLines, contextNewLines, contextOldLines } = createLineLookups(enrichedDiff);
 
   let isValid = false;
 
   // Ensure line numbers are integers
-  if (comment.line !== undefined && comment.line !== null)
-    comment.line = parseInt(comment.line, 10);
-  if (comment.oldLine !== undefined && comment.oldLine !== null)
-    comment.oldLine = parseInt(comment.oldLine, 10);
+  if (comment.line !== undefined && comment.line !== null) comment.line = parseInt(comment.line, 10);
+  if (comment.oldLine !== undefined && comment.oldLine !== null) comment.oldLine = parseInt(comment.oldLine, 10);
 
   // Helper: Find closest valid line
   const findClosestLine = (target, validSet) => {
@@ -385,9 +388,7 @@ function validateComment(comment, enrichedDiffs) {
 
   // 0. HANDLE MISSING LINE NUMBERS (Force Snap to First Change)
   if (!comment.line && !comment.oldLine) {
-    console.warn(
-      `⚠️ No line number provided for ${comment.filePath}. Attempting to snap to first available change.`,
-    );
+    console.warn(`⚠️ No line number provided for ${comment.filePath}. Attempting to snap to first available change.`);
 
     // Prefer Added Line -> New Context Line -> Old Deleted Line
     const firstAdded = addedLines.values().next().value;
@@ -413,13 +414,9 @@ function validateComment(comment, enrichedDiffs) {
       } else if (firstOldContext) {
         comment.oldLine = firstOldContext;
         comment.comment = `**(General File Feedback)** ${comment.comment}`;
-        console.log(
-          `📍 Output snapped to first (old) context line: ${firstOldContext}`,
-        );
+        console.log(`📍 Output snapped to first (old) context line: ${firstOldContext}`);
       } else {
-        console.error(
-          `❌ No valid lines found in ${comment.filePath} to attach comment.`,
-        );
+        console.error(`❌ No valid lines found in ${comment.filePath} to attach comment.`);
         return comment; // Fallback to general
       }
     }
@@ -504,7 +501,7 @@ export async function generateInlineReviews(
   apiKey = null,
   projectContext = "",
   jiraContext = "",
-  repoContext = { configs: {}, docs: [], connected: {} },
+  repoContext = { configs: {}, docs: [], connected: {} }
 ) {
   // Construct Repository Context sections
   let configsStr = "";
@@ -538,14 +535,11 @@ export async function generateInlineReviews(
 
   // 1. Generate Global Context for the AI to understand the scope
   const globalFileContext = enrichedDiffs
-    .map(
-      (d) =>
-        `- ${d.file} (${d.isNew ? "New" : d.isDeleted ? "Deleted" : "Modified"})`,
-    )
+    .map((d) => `- ${d.file} (${d.isNew ? "New" : d.isDeleted ? "Deleted" : "Modified"})`)
     .join("\n");
 
-  const contextString = projectContext 
-    ? `\n# PROJECT CONTEXT & RULES\nThe user has provided the following specific guidelines for this repository. You MUST enforce these rules heavily when reviewing the code:\n${projectContext}\n` 
+  const contextString = projectContext
+    ? `\n# PROJECT CONTEXT & RULES\nThe user has provided the following specific guidelines for this repository. You MUST enforce these rules heavily when reviewing the code:\n${projectContext}\n`
     : "";
 
   const jiraContextString = jiraContext
@@ -655,8 +649,6 @@ ${globalFileContext}
 **Fix:** [Concrete code example showing the solution] - OPTIONAL
 
 **Similar issues found in:** [List of other file paths where this EXACT same issue occurs. Do NOT create separate comments for those files.] - OPTIONAL
-
-Note: Since you only have access to git diffs (not full codebase), you may not always have enough context to provide a complete Fix. In such cases, provide Issue and Risk at minimum.
 
 ## Example (IDEAL - all 3 sections):
 {
@@ -789,13 +781,9 @@ Focus on quality over quantity - one well-explained critical issue > ten vague c
   const chunks = [];
 
   for (const diff of enrichedDiffs) {
-    // Corrected from EnrichedDiffs
     const diffSize = getDiffSize(diff);
     // Keep files together in chunks
-    if (
-      currentSize + diffSize > MAX_CHARS_PER_CHUNK &&
-      currentChunk.length > 0
-    ) {
+    if (currentSize + diffSize > MAX_CHARS_PER_CHUNK && currentChunk.length > 0) {
       chunks.push(currentChunk);
       currentChunk = [];
       currentSize = 0;
@@ -805,115 +793,39 @@ Focus on quality over quantity - one well-explained critical issue > ten vague c
   }
   if (currentChunk.length > 0) chunks.push(currentChunk);
 
-  console.log(
-    `Phase: Reviewing ${enrichedDiffs.length} files in ${chunks.length} chunks...`,
-  );
-
-  // Sequential Processing to respect API Rate Limits (Critical for Free Tier users)
-  const DELAY_BETWEEN_CHUNKS = 2000; // 2 seconds delay between chunks
-
-  for (const [index, chunk] of chunks.entries()) {
-    console.log(`Phase: Processing chunk ${index + 1}/${chunks.length}...`);
-
-    let dynamicCommentsContext = "";
-    if (index > 0 && allComments.length > 0) {
-      // Map to smaller objects to save context tokens, keeping enough info for deduplication
-      const condensedComments = allComments.map((c) => ({
-        file: c.filePath,
-        issue_preview: c.comment.substring(0, 200) + "...",
-      }));
-      
-      dynamicCommentsContext = `
-# COMMENTS ALREADY GENERATED IN PREVIOUS CHUNKS
-You have already generated the following comments for other files in this Merge Request:
-${JSON.stringify(condensedComments, null, 2)}
-
-**CRITICAL INSTRUCTION FOR DEDUPLICATION**: 
-DO NOT report these exact same issues again for files in this current chunk. Assume the developer will fix identical logical errors or missing patterns globally based on your first comment.
-`;
-    }
-
-    const chunkPrompt = `
-    ${prompt}
-    ${dynamicCommentsContext}
-    
-# CODE CHANGES (PART ${index + 1} of ${chunks.length})
-${JSON.stringify(chunk, null, 2)}
-`;
-
-    let attempts = 0;
-    let success = false;
-
-    while (attempts < 5 && !success) {
-      try {
-        attempts++;
-        const chunkComments = await runAI(model, chunkPrompt, {
-          responseSchema: inlineReviewSchema,
-          apiKey,
-        });
-
-        if (Array.isArray(chunkComments)) {
-          allComments.push(...chunkComments);
-          success = true;
-        } else {
-          throw new Error("AI returned valid JSON but not an array");
-        }
-      } catch (e) {
-        console.error(
-          `❌ Error in chunk ${index + 1} (Attempt ${attempts}/5):`,
-          e.message,
-        );
-
-        // Smart handling for Rate Limits (429) or High Demand (503)
-        const isRateLimit =
-          e.message.includes("429") || e.message.includes("quota") || e.message.includes("503") || e.message.includes("demand");
-        const baseBackoff = isRateLimit ? 8000 : 3000; // Wait much longer for demand issues
-
-        if (attempts < 5) {
-          const backoff = baseBackoff * Math.pow(2, attempts - 1);
-          console.log(`⏳ Waiting ${backoff}ms before retry...`);
-          await new Promise((r) => setTimeout(r, backoff));
-        }
-      }
-    }
-
-    if (!success) {
-      console.error(
-        `🚨 Fatal: Failed to process chunk ${index + 1} after 3 attempts. Review incomplete for this section.`,
-      );
-    }
-
-    // Add delay between successful chunks to avoid hitting throughput limits
-    if (index < chunks.length - 1) {
-      await new Promise((r) => setTimeout(r, DELAY_BETWEEN_CHUNKS));
-    }
-  }
-
-  const comments = allComments;
-
-  if (!Array.isArray(comments)) {
-    console.warn("AI returned valid JSON but not an array");
-    return [];
-  }
-
-  // Validate and filter comments
-  const validComments = comments
-    .filter((comment) => validateCommentStructure(comment))
-    .map((comment) => validateComment(comment, enrichedDiffs))
-    .filter(Boolean) // Removes nulls (e.g., binary files or missing files)
-    .filter((newComment) => {
-      const line = newComment.line || newComment.oldLine;
-      const isDuplicate = (existingComments || []).some((existing) => {
-        return existing.filePath === newComment.filePath && existing.line === line;
+  for (const chunk of chunks) {
+    try {
+      const result = await runAI(model, prompt + `\n\n## Code Diffs to Review (Current Chunk):\n${JSON.stringify(chunk, null, 2)}`, {
+        responseSchema: inlineReviewSchema,
+        apiKey,
       });
-      if (isDuplicate) {
-        return false;
-      }
-      return true;
-    });
 
-  console.log(
-    `✅ Validated ${validComments.length}/${comments.length} inline comments (structure + line numbers)`,
-  );
-  return validComments;
+      if (Array.isArray(result)) {
+        for (const comment of result) {
+          if (validateCommentStructure(comment)) {
+            const validated = validateComment(comment, enrichedDiffs);
+            if (validated) {
+              allComments.push(validated);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.error("❌ Inline Review Chunk Failed:", error.message);
+    }
+  }
+
+  // Final deduplication (safety guard)
+  const uniqueComments = [];
+  const seen = new Set();
+
+  for (const comment of allComments) {
+    const key = `${comment.filePath}:${comment.line || comment.oldLine}:${comment.comment.substring(0, 50)}`;
+    if (!seen.has(key)) {
+      uniqueComments.push(comment);
+      seen.add(key);
+    }
+  }
+
+  return uniqueComments;
 }

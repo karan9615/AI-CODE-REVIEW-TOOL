@@ -4,7 +4,7 @@ import {
   generateInlineReviews,
   formatDescriptionToMarkdown,
 } from "../review/reviewService.js";
-import { jiraDiscovery } from "./jiraDiscovery.js";
+import jiraDiscovery from "./jiraDiscovery.js";
 import { repoDiscovery } from "./repoDiscovery.js";
 import logger from "../utils/logger.js";
 

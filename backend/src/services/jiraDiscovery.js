@@ -1,17 +1,13 @@
-import supabase from "../config/supabase.js";
-import { AIService } from "../ai/AIService.js";
 import logger from "../utils/logger.js";
+import { AIService } from "../ai/AIService.js";
+import supabase from "../config/supabase.js";
 
 /**
- * Jira Discovery Service
- * Logic for finding the most relevant Jira ticket for a given MR.
+ * Service to discover and link Jira tickets to MRs
  */
-export const jiraDiscovery = {
+const jiraDiscovery = {
   /**
-   * Find the best matching Jira ticket for an MR
-   * @param {Object} mrData - MR details (title, source_branch, description)
-   * @param {Object} options - Search options (e.g., threshold)
-   * @returns {Promise<Object|null>} The matched ticket or null
+   * Find a relevant Jira ticket for the MR
    */
   async findTicket(mrData, options = {}) {
     const { title, source_branch, description } = mrData;
@@ -20,14 +16,21 @@ export const jiraDiscovery = {
     logger.info(`🔍 Discovering Jira ticket for MR: "${title}"`);
 
     // 1. Try Regex Pattern Matching (Highest Priority)
-    const ticketId =
-      this.extractId(title) ||
-      this.extractId(source_branch) ||
-      this.extractId(description);
+    // Collect all unique potential ticket IDs from title, branch, and description
+    const potentialIds = [
+      ...new Set([
+        ...this.extractIds(title),
+        ...this.extractIds(source_branch),
+        ...this.extractIds(description),
+      ]),
+    ].slice(0, 5); // Limit to first 5 unique potential IDs for performance
 
-    if (ticketId) {
-      logger.info(`🎯 Found Jira ID in text: ${ticketId}`);
-      return await this.getTicketById(ticketId);
+    for (const ticketId of potentialIds) {
+      const ticket = await this.getTicketById(ticketId);
+      if (ticket) {
+        logger.info(`✅ Verified Jira ticket match: ${ticketId}`);
+        return ticket;
+      }
     }
 
     logger.info(`🕵️ No explicit Jira ID found. Attempting semantic search...`);
@@ -38,11 +41,15 @@ export const jiraDiscovery = {
     // Use both title and branch for semantic search to maximize hit rate
     const searchQuery = `${title} ${source_branch || ""}`.trim();
     const result = await this.searchBySimilarity(searchQuery, { threshold, matchCount });
-    
+
     // Safety Guard: Only link if similarity is high (>= 75%)
     // This prevents "contamination" where a project might match a similar-sounding ticket from a different project
     if (result && result.similarity < 0.75) {
-      logger.info(`⚠️ Closest Jira match only has ${Math.round(result.similarity * 100)}% similarity. Ignoring to avoid contamination.`);
+      logger.info(
+        `⚠️ Closest Jira match only has ${Math.round(
+          result.similarity * 100
+        )}% similarity. Ignoring to avoid contamination.`
+      );
       return null;
     }
 
@@ -50,12 +57,14 @@ export const jiraDiscovery = {
   },
 
   /**
-   * Extract Jira ID (e.g., BEV-42) from text
+   * Extract all potential Jira IDs (e.g., BEV-42) from text
+   * @returns {Array<string>} Array of unique ticket IDs in uppercase
    */
-  extractId(text) {
-    if (!text) return null;
-    const match = text.match(/[A-Z]+-\d+/);
-    return match ? match[0] : null;
+  extractIds(text) {
+    if (!text) return [];
+    // Regex: Start with letter, then letters/numbers, followed by - and digits
+    const matches = text.match(/[a-zA-Z][a-zA-Z0-9]+-\d+/gi);
+    return matches ? matches.map((m) => m.toUpperCase()) : [];
   },
 
   async getTicketById(key) {
@@ -95,7 +104,9 @@ export const jiraDiscovery = {
       // 1. Identify the project prefix (e.g., "CERA")
       const projectKey = this.extractProjectKey(query);
       if (!projectKey) {
-        logger.info(`ℹ️ No Jira project key detected in MR metadata. Skipping semantic search to prevent contamination.`);
+        logger.info(
+          `ℹ️ No Jira project key detected in MR metadata. Skipping semantic search to prevent contamination.`
+        );
         return null;
       }
 
@@ -115,7 +126,7 @@ export const jiraDiscovery = {
         const ticket = await this.getTicketById(bestMatch.ticket_key);
         return {
           ...ticket,
-          similarity: bestMatch.similarity
+          similarity: bestMatch.similarity,
         };
       }
 
@@ -131,7 +142,9 @@ export const jiraDiscovery = {
    */
   extractProjectKey(text) {
     if (!text) return null;
-    const match = text.match(/([A-Z]+)-\d+/);
-    return match ? match[1] : null;
+    const match = text.match(/([a-zA-Z][a-zA-Z0-9]+)-\d+/i);
+    return match ? match[1].toUpperCase() : null;
   },
 };
+
+export default jiraDiscovery;

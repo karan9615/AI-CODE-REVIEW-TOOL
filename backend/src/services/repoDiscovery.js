@@ -110,8 +110,11 @@ export const repoDiscovery = {
       return changedDirs.has(dir);
     });
 
+    // 3. Prioritize files with "CONTEXT" in the name
+    const contextMDs = mdFiles.filter(f => f.name.toLowerCase().includes("context"));
+
     // Combine and limit to avoid token overload (max 10 full files)
-    const priorityFiles = [...new Set([...rootMDs, ...localMDs])].slice(0, 10);
+    const priorityFiles = [...new Set([...rootMDs, ...localMDs, ...contextMDs])].slice(0, 10);
 
     priorityFiles.forEach(file => {
       fetchedPaths.add(file.path);
