@@ -3,6 +3,7 @@ import path from "path";
 import { runAI } from "../ai/aiRouter.js";
 import { mrContentSchema, inlineReviewSchema } from "./reviewSchemas.js";
 import logger from "../utils/logger.js";
+import { applyBudget, BUDGETS } from "../utils/tokenBudget.js";
 
 // Cache rules to avoid repeated file reads
 let cachedRules = null;
@@ -21,6 +22,72 @@ function loadRules() {
     }
   }
   return cachedRules;
+}
+
+// ─── Language-Specific Prompt Sections ───────────────────────────────────────
+// Only the section matching the PR's primary language is injected into the
+// prompt. A JS-only PR doesn't need Python/Java/Go check sections.
+const LANGUAGE_CHECKS = {
+  javascript: `**JavaScript/TypeScript:**
+- Await missing on Promises → Add await or .then()
+- Promise.all for parallel operations → Replace sequential awaits
+- Optional chaining for nested objects → Use obj?.prop?.subprop
+- Type assertions in TS → Validate types at runtime too`,
+
+  python: `**Python:**
+- SQL without parameterization → Use cursor.execute with %s placeholders
+- Open files without context manager → Use 'with open() as f:'
+- Mutable default arguments → Use None and initialize in function body
+- except: without specific error → Catch specific exceptions (ValueError, etc.)`,
+
+  java: `**Java:**
+- Resources not in try-with-resources → Use try (Resource r = ...) {}
+- String concatenation in loops → Use StringBuilder
+- == for String comparison → Use .equals()
+- Unchecked exceptions not documented → Add @throws JavaDoc`,
+
+  go: `**Go:**
+- Ignored errors (err := func(); do stuff) → Check if err != nil
+- Defer in loops → Move to separate function to avoid resource buildup
+- Goroutines without WaitGroup → Add sync.WaitGroup to track completion
+- Race conditions on shared variables → Use channels or sync.Mutex`,
+
+  generic: `Check for language-appropriate patterns: null handling, error propagation, resource cleanup, and input validation.`,
+};
+
+/**
+ * Detect the primary programming language from a list of file paths or diff objects.
+ * Accepts either raw diff objects (with new_path) or enriched diffs (with file property).
+ */
+function detectPrimaryLanguage(diffs) {
+  const extCount = {};
+  diffs.forEach((d) => {
+    const filePath = d.new_path || d.file || "";
+    const ext = filePath.split(".").pop()?.toLowerCase();
+    if (ext && ext.length < 6) extCount[ext] = (extCount[ext] || 0) + 1;
+  });
+
+  const sorted = Object.entries(extCount).sort((a, b) => b[1] - a[1]);
+  const topExt = sorted[0]?.[0];
+
+  if (["js", "ts", "jsx", "tsx", "vue", "mjs"].includes(topExt)) return "javascript";
+  if (topExt === "py") return "python";
+  if (["java", "kt"].includes(topExt)) return "java";
+  if (topExt === "go") return "go";
+  return "generic";
+}
+
+/**
+ * Convert existing comment objects into a compact plain-text list.
+ * The AI only needs these for deduplication — format doesn't matter.
+ * Saves ~30% over JSON.stringify with null, 2.
+ */
+function compactExistingComments(existingComments) {
+  if (!existingComments || existingComments.length === 0) return "None";
+  const lines = existingComments
+    .map((c) => `- ${c.filePath}:${c.line || c.oldLine || "?"} → "${c.preview || ""}"`);
+  // Apply token budget to the full list
+  return applyBudget(lines.join("\n"), BUDGETS.EXISTING_COMMENTS, "existing comments");
 }
 
 /**
@@ -60,6 +127,18 @@ export async function generateMRContent(
     });
   }
 
+  // Build a compact diff representation for content generation.
+  // The AI only needs to understand WHAT changed (not every line) to write a title/description.
+  // Full line-by-line diffs are sent separately in generateInlineReviews for deep review.
+  const compactDiffsForContent = diffs
+    .filter((d) => !d.binary)
+    .map((d) => {
+      const status = d.new_file ? "added" : d.deleted_file ? "deleted" : d.renamed_file ? `renamed from ${d.old_path}` : "modified";
+      // Cap individual file diffs at 4,000 chars to prevent one large file dominating tokens
+      const diffSnippet = d.diff ? d.diff.substring(0, 4000) : "";
+      return { path: d.new_path || d.old_path, status, diff: diffSnippet };
+    });
+
   const prompt = `You are a Senior Software Engineer reviewing a GitLab Merge Request.
 ${contextString}
 ${jiraContextString}
@@ -93,7 +172,7 @@ Your job is to generate a PRODUCTION-READY, ACCURATE Merge Request title and des
 ${JSON.stringify(rules, null, 2)}
 
 ## Code Diffs
-${JSON.stringify(diffs, null, 2)}
+${JSON.stringify(compactDiffsForContent)}
 `;
 
   try {
@@ -690,30 +769,7 @@ If the **exact same issue** (e.g., same logic error, same naming violation, same
 - Do NOT create separate comment objects for the same issue found in multiple locations.
 
 # LANGUAGE-SPECIFIC CHECKS
-
-**JavaScript/TypeScript:**
-- Await missing on Promises → Add await or .then()
-- Promise.all for parallel operations → Replace sequential awaits
-- Optional chaining for nested objects → Use obj?.prop?.subprop
-- Type assertions in TS → Validate types at runtime too
-
-**Python:**
-- SQL without parameterization → Use cursor.execute with %s placeholders
-- Open files without context manager → Use 'with open() as f:'
-- Mutable default arguments → Use None and initialize in function body
-- except: without specific error → Catch specific exceptions (ValueError, etc.)
-
-**Java:**
-- Resources not in try-with-resources → Use try (Resource r = ...) {}
-- String concatenation in loops → Use StringBuilder
-- == for String comparison → Use .equals()
-- Unchecked exceptions not documented → Add @throws JavaDoc
-
-**Go:**
-- Ignored errors (err := func(); do stuff) → Check if err != nil
-- Defer in loops → Move to separate function to avoid resource buildup
-- Goroutines without WaitGroup → Add sync.WaitGroup to track completion
-- Race conditions on shared variables → Use channels or sync.Mutex
+${LANGUAGE_CHECKS[detectPrimaryLanguage(enrichedDiffs)] || LANGUAGE_CHECKS.generic}
 
 # CONTEXT
 
@@ -737,7 +793,7 @@ Constraints:
 ${JSON.stringify(rules, null, 2)}
 
 # EXISTING COMMENTS (Check these to avoid duplicates)
-${JSON.stringify(existingComments || [], null, 2)}
+${compactExistingComments(existingComments)}
 
 # OUTPUT FORMAT (STRICT REQUIREMENTS)
 
